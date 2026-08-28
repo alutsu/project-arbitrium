@@ -1,5 +1,6 @@
 const MIN_GOLD = 0;
-const MIN_SURVIVABLE_VITALITY = 1;
+const MIN_VITALITY = 0;
+const NOTHING = 0;
 
 /**
  * The player's spendable resources. Immutable: paying returns a new instance rather
@@ -18,15 +19,18 @@ export class PlayerResources {
   }
 
   public loseVitality(damage: number): PlayerResources {
-    return new PlayerResources(this.gold, this.vitality - damage);
+    return new PlayerResources(this.gold, Math.max(MIN_VITALITY, this.vitality - damage));
   }
 
   /**
-   * Whether the player would survive paying this much Vitality. A Parley is meant to
-   * be 100% survival (GDD 8.3), so a demand that would kill is refused rather than
-   * honoured.
+   * Whether this fraction of the purse is worth anything. An empty, or nearly empty,
+   * purse pays nothing, so the demand is taken in Vitality instead (GDD 4.1.2).
    */
-  public canSurviveVitalityCost(damage: number): boolean {
-    return this.vitality - damage >= MIN_SURVIVABLE_VITALITY;
+  public canPayGoldFraction(fraction: number): boolean {
+    return Math.floor(this.gold * fraction) > NOTHING;
+  }
+
+  public get isDefeated(): boolean {
+    return this.vitality <= MIN_VITALITY;
   }
 }

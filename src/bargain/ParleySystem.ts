@@ -34,8 +34,6 @@ export interface ParleyFrame {
   readonly status: ParleyStatus;
   /** True once the Aggro Delay has lapsed and demands cost more (GDD 4.1.1). */
   readonly isLate: boolean;
-  /** Set on the frame a demand was refused, for example one that would be fatal. */
-  readonly refusal: string | null;
 }
 
 /**
@@ -67,7 +65,6 @@ export class ParleySystem {
         visible: [],
         status: this.deps.session.update({ isParleying: false, target: null, deltaMs: 0 }),
         isLate,
-        refusal: null,
       };
     }
 
@@ -78,7 +75,10 @@ export class ParleySystem {
     );
     const visible = inSphere.map((bargainable) => ({
       bargainable,
-      cost: this.deps.service.costFor(bargainable.demand, input.roomElapsedMs),
+      cost: this.deps.service.costFor(bargainable.demand, {
+        roomElapsedMs: input.roomElapsedMs,
+        resources: this.currentResources,
+      }),
     }));
 
     const status = this.deps.session.update({
@@ -87,25 +87,24 @@ export class ParleySystem {
       deltaMs: input.deltaMs,
     });
 
-    const refusal = status.kind === 'completed' ? this.settle(status.target, input) : null;
-    return { isParleying: true, visible, status, isLate, refusal };
+    if (status.kind === 'completed') {
+      this.settle(status.target, input);
+    }
+    return { isParleying: true, visible, status, isLate };
   }
 
-  /** Returns a refusal reason, or null when the bargain went through. */
-  private settle(target: Bargainable, input: ParleyInputFrame): string | null {
-    const cost = this.deps.service.costFor(target.demand, input.roomElapsedMs);
-    const settled = this.deps.service.settle(cost, this.currentResources);
-    if (!settled.ok) {
-      return settled.error;
-    }
+  private settle(target: Bargainable, input: ParleyInputFrame): void {
+    const cost = this.deps.service.costFor(target.demand, {
+      roomElapsedMs: input.roomElapsedMs,
+      resources: this.currentResources,
+    });
+    this.currentResources = this.deps.service.settle(cost, this.currentResources);
 
-    this.currentResources = settled.value;
     const index = this.bargainables.indexOf(target);
     if (index >= 0) {
       this.bargainables.splice(index, 1);
     }
     // Paid off, so it leaves without dropping anything (GDD 2.2.2).
     target.flee();
-    return null;
   }
 }

@@ -3,43 +3,29 @@ import type { PlayerResources } from '../player/PlayerResources';
 
 const MARGIN = 14;
 const STYLE = { fontFamily: 'monospace', fontSize: '15px', color: '#c9c9d4' };
-const REFUSAL_STYLE = { fontFamily: 'monospace', fontSize: '13px', color: '#ff8f6b' };
-const REFUSAL_OFFSET_Y = 22;
-const REFUSAL_LINGER_MS = 2000;
-const NO_TIME = 0;
+const DEFEAT_STYLE = { fontFamily: 'monospace', fontSize: '13px', color: '#ff8f6b' };
+const DEFEAT_OFFSET_Y = 22;
+const DEFEAT_MESSAGE = 'Bargained away the last of your Vitality.';
 
-/** Shows what a Parley actually costs the player, and why one was refused. */
+/** Shows what a Parley actually costs the player. */
 export class ResourceHud {
   private readonly readout: Phaser.GameObjects.Text;
-  private readonly refusal: Phaser.GameObjects.Text;
-  private refusalRemainingMs = NO_TIME;
+  private readonly defeat: Phaser.GameObjects.Text;
 
   public constructor(scene: Phaser.Scene) {
     this.readout = scene.add.text(MARGIN, MARGIN, '', STYLE);
-    this.refusal = scene.add.text(MARGIN, MARGIN + REFUSAL_OFFSET_Y, '', REFUSAL_STYLE);
+    this.defeat = scene.add.text(MARGIN, MARGIN + DEFEAT_OFFSET_Y, '', DEFEAT_STYLE);
   }
 
-  public render(resources: PlayerResources, refusal: string | null, deltaMs: number): void {
+  public render(resources: PlayerResources): void {
     this.readout.setText(
       `Gold ${String(resources.gold)}    Vitality ${String(resources.vitality)}`,
     );
-
-    if (refusal !== null) {
-      this.refusal.setText(refusal);
-      this.refusalRemainingMs = REFUSAL_LINGER_MS;
-      return;
-    }
-
-    if (this.refusalRemainingMs > NO_TIME) {
-      this.refusalRemainingMs -= deltaMs;
-      if (this.refusalRemainingMs <= NO_TIME) {
-        this.refusal.setText('');
-      }
-    }
+    this.defeat.setText(resources.isDefeated ? DEFEAT_MESSAGE : '');
   }
 
   public destroy(): void {
     this.readout.destroy();
-    this.refusal.destroy();
+    this.defeat.destroy();
   }
 }

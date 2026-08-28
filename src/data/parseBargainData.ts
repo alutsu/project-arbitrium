@@ -46,6 +46,11 @@ function parseSettings(raw: JsonRecord): Result<BargainSettings> {
   if (!holdDurationMs.ok) return err(`bargain.json: ${holdDurationMs.error}`);
   const sphereRadiusPixels = readField.number(raw, 'sphereRadiusPixels');
   if (!sphereRadiusPixels.ok) return err(`bargain.json: ${sphereRadiusPixels.error}`);
+  const vitalityForUnpayableGold = readField.number(raw, 'vitalityForUnpayableGold');
+  if (!vitalityForUnpayableGold.ok) return err(`bargain.json: ${vitalityForUnpayableGold.error}`);
+  if (vitalityForUnpayableGold.value <= MIN_DURATION_MS) {
+    return err('bargain.json: "vitalityForUnpayableGold" must be greater than zero');
+  }
 
   if (lateCostMultiplier.value < MIN_MULTIPLIER) {
     return err('bargain.json: "lateCostMultiplier" must be at least 1, or late is cheaper');
@@ -61,6 +66,7 @@ function parseSettings(raw: JsonRecord): Result<BargainSettings> {
     aggroDelayMs: aggroDelayMs.value,
     lateCostMultiplier: lateCostMultiplier.value,
     holdDurationMs: holdDurationMs.value,
+    vitalityForUnpayableGold: vitalityForUnpayableGold.value,
     sphereRadiusPixels: sphereRadiusPixels.value,
   });
 }

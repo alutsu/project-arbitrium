@@ -5,6 +5,11 @@ export interface BargainSettings {
   readonly lateCostMultiplier: number;
   /** How long Parley must be held on one enemy to settle with it. */
   readonly holdDurationMs: number;
+  /**
+   * Vitality charged in place of a Gold demand the player cannot pay, quoted for a
+   * demand of the entire purse; a smaller demand takes proportionally less (GDD 4.1.2).
+   */
+  readonly vitalityForUnpayableGold: number;
   /** Radius of the Sphere of Influence projected while Parley is held (GDD 2.2.1). */
   readonly sphereRadiusPixels: number;
 }

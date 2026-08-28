@@ -72,7 +72,8 @@ In an action roguelite, negotiation cannot be a menu-driven conversation; it mus
 This design choice creates a negative feedback loop known as the **"Death Spiral."**
 
 * **The Trap:** If a player bargains too often, they gain no Gold to buy passive items and no XP (if an XP system exists). They reach the Boss (who cannot be bargained with) underpowered.
-* **The Utility:** The mechanic serves as a "Run Saver." If the player enters a room with 1 HP and a terrible weapon, bargaining is the *only* logical choice. It converts "Game Over" into "One More Chance."
+* **The Utility:** The mechanic serves as a "Run Saver," but only while the player is solvent. If the player enters a room with 1 HP, a terrible weapon and gold in the purse, bargaining is the *only* logical choice, and it converts "Game Over" into "One More Chance."
+* **The Sting:** Once the gold is gone, demands are taken in Vitality instead (4.1.2). The same Parley that saved an earlier run will end this one. The Death Spiral is not merely a slow loss of power — it is the mechanism by which mercy turns lethal.
 
 ### 2.3 Inventory & Weapon Systems
 
@@ -281,7 +282,9 @@ The "Parley Phase" occurs at the start of the encounter.
 | Vitality | Take flat damage. | Immediate Risk: Closer to death. |
 | Pride | Temp debuff (-Speed). | Skill Risk: Next room is harder. |
 
-A Parley is 100% survival (see 8.3), so a Vitality demand that would reduce the player to zero is **refused** rather than honoured: the enemy stays, and nothing is charged. A demand that leaves exactly 1 Vitality is allowed — that is the Run Saver case in 2.2.2.
+**A Parley can kill.** A Vitality demand is paid in full even when it empties the player. And a Gold demand an empty purse cannot answer does not lapse — it **converts to Vitality**, scaled by how greedy it was: a demand for X% of the purse costs `ceil(X * vitalityForUnpayableGold)`. A purse too thin to yield a single coin counts as empty.
+
+Mercy is therefore only cheap while the player is solvent. Bargain the gold away and the price starts coming out of flesh; keep bargaining and it kills. This is where the Death Spiral in 2.2.2 actually ends.
 
 Pride is not yet implemented. A debuff scoped to "the next room" needs the dungeon topology from Sprint 4 to know when it expires; charging it before then would apply a penalty the game could never lift.
 
@@ -292,6 +295,7 @@ Pride is not yet implemented. A debuff scoped to "the next room" needs the dunge
 | Aggro Delay | 1500 ms | The "Notice" window from 4.1.1, during which demands are at list price. |
 | Late Cost Multiplier | 1.5 | The +50% surcharge from 4.1.1, applied once the Aggro Delay lapses. |
 | Hold Duration | 900 ms | Long enough that holding is a real commitment, short enough to be worth it under pressure. First-pass value. |
+| Vitality for Unpayable Gold | 40 | Vitality charged for a demand of the *entire* purse when the player cannot pay; a smaller demand costs proportionally less. Against 100 Max Vitality, roughly two and a half full-purse demands are fatal. First-pass value. |
 | Sphere of Influence Radius | 170 px | Reaches a nearby enemy without covering the arena, so positioning still matters. First-pass value. |
 
 ### 4.2 The Weapon Generation Algorithm
@@ -373,7 +377,7 @@ The Forge is the primary "Gold Sink."
 ### 8.3 The "No Reward" Bargain Math
 
 * **Fight:** High risk, Gold/XP reward.
-* **Bargain:** 100% Survival, Gold cost.
+* **Bargain:** Survival while solvent. Gold cost, or Vitality once the purse is empty — at which point a Parley can kill.
 * **Dynamic:** Bargaining drains the resource (Gold) needed for the Forge, eventually forcing the player to fight to regain purchasing power.
 
 ---

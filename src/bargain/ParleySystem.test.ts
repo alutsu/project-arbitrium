@@ -11,6 +11,7 @@ const SETTINGS: BargainSettings = {
   aggroDelayMs: 1500,
   lateCostMultiplier: 1.5,
   holdDurationMs: 900,
+  vitalityForUnpayableGold: 40,
   sphereRadiusPixels: 170,
 };
 
@@ -117,14 +118,33 @@ describe('ParleySystem', () => {
     expect(system.resources.gold).toBe(goldAfterFirst);
   });
 
-  it('refuses a fatal demand and leaves the enemy in place', () => {
+  it('lets a Parley kill, which is how the Death Spiral ends (GDD 2.2.2)', () => {
     const enemy = new TestEnemy(IN_RANGE, {
       tier: 'Normal',
       cost: { kind: 'Vitality', damage: 30 },
     });
     const system = systemWith([enemy], 200, 20);
     parleyFor(system, 9);
-    expect(enemy.fled).toBe(false);
-    expect(system.resources.vitality).toBe(20);
+    expect(enemy.fled).toBe(true);
+    expect(system.resources.vitality).toBe(0);
+    expect(system.resources.isDefeated).toBe(true);
+  });
+
+  it('quotes a broke player the Vitality price for a Gold demand (GDD 4.1.2)', () => {
+    const system = systemWith([new TestEnemy(IN_RANGE)], 0, 50);
+    const frame = system.update({
+      isParleying: true,
+      playerPosition: PLAYER_AT,
+      deltaMs: 100,
+      roomElapsedMs: EARLY_MS,
+    });
+    expect(frame.visible[0]?.cost).toEqual({ kind: 'Vitality', damage: 10 });
+  });
+
+  it('charges a broke player in Vitality when the hold completes', () => {
+    const system = systemWith([new TestEnemy(IN_RANGE)], 0, 50);
+    parleyFor(system, 9);
+    expect(system.resources.vitality).toBe(40);
+    expect(system.resources.gold).toBe(0);
   });
 });

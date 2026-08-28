@@ -119,7 +119,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.parleyView?.render(frame, actor.position.x, actor.position.y);
-    this.hud?.render(parley.resources, frame.refusal, delta);
+    this.hud?.render(parley.resources);
   }
 
   private createParleySystem(database: GameDatabase): ParleySystem {

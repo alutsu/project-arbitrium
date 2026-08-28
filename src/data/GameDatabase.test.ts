@@ -39,6 +39,7 @@ const BARGAIN: BargainData = {
     aggroDelayMs: 1500,
     lateCostMultiplier: 1.5,
     holdDurationMs: 900,
+    vitalityForUnpayableGold: 40,
     sphereRadiusPixels: 170,
   },
   demands: [{ tier: 'Normal', cost: { kind: 'Gold', fractionOfGold: 0.15 } }],

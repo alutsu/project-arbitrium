@@ -18,10 +18,16 @@ describe('PlayerResources', () => {
     expect(new PlayerResources(0, 50).spendGoldFraction(1).gold).toBe(0);
   });
 
-  it('knows when a vitality cost would be survivable', () => {
-    const resources = new PlayerResources(0, 10);
-    expect(resources.canSurviveVitalityCost(9)).toBe(true);
-    expect(resources.canSurviveVitalityCost(10)).toBe(false);
-    expect(resources.canSurviveVitalityCost(11)).toBe(false);
+  it('knows when a fraction of the purse is worth anything', () => {
+    expect(new PlayerResources(100, 50).canPayGoldFraction(0.15)).toBe(true);
+    expect(new PlayerResources(0, 50).canPayGoldFraction(1)).toBe(false);
+    expect(new PlayerResources(4, 50).canPayGoldFraction(0.2)).toBe(false);
+  });
+
+  it('bottoms vitality out at zero and reports defeat', () => {
+    const dead = new PlayerResources(0, 6).loseVitality(10);
+    expect(dead.vitality).toBe(0);
+    expect(dead.isDefeated).toBe(true);
+    expect(new PlayerResources(0, 6).loseVitality(5).isDefeated).toBe(false);
   });
 });

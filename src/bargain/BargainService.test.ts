@@ -8,6 +8,7 @@ const SETTINGS: BargainSettings = {
   aggroDelayMs: 1500,
   lateCostMultiplier: 1.5,
   holdDurationMs: 900,
+  vitalityForUnpayableGold: 40,
   sphereRadiusPixels: 170,
 };
 
@@ -18,67 +19,81 @@ const vitalityDemand: BargainDemand = { tier: 'Normal', cost: { kind: 'Vitality'
 
 const DURING_AGGRO_DELAY = 1000;
 const AFTER_AGGRO_DELAY = 2000;
+const SOLVENT = new PlayerResources(200, 50);
+const BROKE = new PlayerResources(0, 50);
+
+const priceFor = (demand: BargainDemand, roomElapsedMs: number, resources = SOLVENT) =>
+  service.costFor(demand, { roomElapsedMs, resources });
 
 describe('BargainService', () => {
   it('charges the listed price inside the Aggro Delay (GDD 4.1.1)', () => {
-    expect(service.costFor(goldDemand, DURING_AGGRO_DELAY)).toEqual({
+    expect(priceFor(goldDemand, DURING_AGGRO_DELAY)).toEqual({
       kind: 'Gold',
       fractionOfGold: 0.2,
     });
     expect(service.isLate(DURING_AGGRO_DELAY)).toBe(false);
   });
 
-  it('charges the listed price right up to the boundary', () => {
+  it('treats the Aggro Delay boundary as still on time', () => {
     expect(service.isLate(SETTINGS.aggroDelayMs)).toBe(false);
     expect(service.isLate(SETTINGS.aggroDelayMs + 1)).toBe(true);
   });
 
   it('adds 50% to a late gold demand', () => {
-    expect(service.costFor(goldDemand, AFTER_AGGRO_DELAY)).toEqual({
+    expect(priceFor(goldDemand, AFTER_AGGRO_DELAY)).toEqual({
       kind: 'Gold',
       fractionOfGold: 0.30000000000000004,
     });
   });
 
   it('adds 50% to a late vitality demand, rounding up to whole points', () => {
-    expect(service.costFor(vitalityDemand, AFTER_AGGRO_DELAY)).toEqual({
-      kind: 'Vitality',
-      damage: 15,
-    });
+    expect(priceFor(vitalityDemand, AFTER_AGGRO_DELAY)).toEqual({ kind: 'Vitality', damage: 15 });
   });
 
   it('never demands more gold than the player has', () => {
     const greedy: BargainDemand = { tier: 'Rare', cost: { kind: 'Gold', fractionOfGold: 0.8 } };
-    expect(service.costFor(greedy, AFTER_AGGRO_DELAY)).toEqual({
-      kind: 'Gold',
-      fractionOfGold: 1,
+    expect(priceFor(greedy, AFTER_AGGRO_DELAY)).toEqual({ kind: 'Gold', fractionOfGold: 1 });
+  });
+
+  it('takes an unpayable gold demand out of Vitality instead (GDD 4.1.2)', () => {
+    expect(priceFor(goldDemand, DURING_AGGRO_DELAY, BROKE)).toEqual({
+      kind: 'Vitality',
+      damage: 8,
+    });
+  });
+
+  it('scales the Vitality fallback by how greedy the demand was', () => {
+    const greedy: BargainDemand = { tier: 'Rare', cost: { kind: 'Gold', fractionOfGold: 0.5 } };
+    expect(priceFor(greedy, DURING_AGGRO_DELAY, BROKE)).toEqual({ kind: 'Vitality', damage: 20 });
+  });
+
+  it('falls back when the purse is too thin to round up to a single coin', () => {
+    const almostBroke = new PlayerResources(4, 50);
+    expect(priceFor(goldDemand, DURING_AGGRO_DELAY, almostBroke)).toEqual({
+      kind: 'Vitality',
+      damage: 8,
+    });
+  });
+
+  it('applies the late surcharge before converting to Vitality', () => {
+    expect(priceFor(goldDemand, AFTER_AGGRO_DELAY, BROKE)).toEqual({
+      kind: 'Vitality',
+      damage: 13,
     });
   });
 
   it('settles a gold demand against the player purse', () => {
-    const settled = service.settle(
-      { kind: 'Gold', fractionOfGold: 0.25 },
-      new PlayerResources(200, 50),
-    );
-    if (!settled.ok) throw new Error(settled.error);
-    expect(settled.value.gold).toBe(150);
+    expect(service.settle({ kind: 'Gold', fractionOfGold: 0.25 }, SOLVENT).gold).toBe(150);
   });
 
   it('settles a vitality demand', () => {
-    const settled = service.settle({ kind: 'Vitality', damage: 10 }, new PlayerResources(0, 50));
-    if (!settled.ok) throw new Error(settled.error);
-    expect(settled.value.vitality).toBe(40);
+    expect(service.settle({ kind: 'Vitality', damage: 10 }, BROKE).vitality).toBe(40);
   });
 
-  it('refuses a demand that would kill, because a Parley is 100% survival (GDD 8.3)', () => {
-    const settled = service.settle({ kind: 'Vitality', damage: 10 }, new PlayerResources(0, 10));
-    expect(settled.ok).toBe(false);
-    if (!settled.ok) expect(settled.error).toContain('fatal');
-  });
-
-  it('allows a demand that leaves exactly one vitality, the Run Saver case (GDD 2.2.2)', () => {
-    const settled = service.settle({ kind: 'Vitality', damage: 9 }, new PlayerResources(0, 10));
-    if (!settled.ok) throw new Error(settled.error);
-    expect(settled.value.vitality).toBe(1);
+  it('lets a Parley kill a player who can no longer pay (GDD 2.2.2)', () => {
+    const dying = new PlayerResources(0, 6);
+    const after = service.settle({ kind: 'Vitality', damage: 8 }, dying);
+    expect(after.vitality).toBe(0);
+    expect(after.isDefeated).toBe(true);
   });
 });

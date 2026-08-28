@@ -5,6 +5,7 @@ const VALID = {
   aggroDelayMs: 1500,
   lateCostMultiplier: 1.5,
   holdDurationMs: 900,
+  vitalityForUnpayableGold: 40,
   sphereRadiusPixels: 170,
   demands: [
     { tier: 'Normal', cost: { kind: 'Gold', fractionOfGold: 0.15 } },
@@ -34,6 +35,12 @@ describe('parseBargainData', () => {
   it('rejects a hold or sphere that would make Parley free', () => {
     expect(errorOf({ ...VALID, holdDurationMs: 0 })).toContain('holdDurationMs');
     expect(errorOf({ ...VALID, sphereRadiusPixels: 0 })).toContain('sphereRadiusPixels');
+  });
+
+  it('rejects a Vitality fallback that would make an empty purse free', () => {
+    expect(errorOf({ ...VALID, vitalityForUnpayableGold: 0 })).toContain(
+      'vitalityForUnpayableGold',
+    );
   });
 
   it('requires at least one demand, or no enemy could ever be bargained with', () => {
