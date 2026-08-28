@@ -241,13 +241,32 @@ Automated pass — start the dev server, then drive it headless:
 
 ```bash
 npm run dev &                       # or: npm run build && npm run preview
-brave --headless --disable-gpu --no-sandbox --enable-unsafe-swiftshader \
-  --virtual-time-budget=6000 --enable-logging=stderr --v=0 \
-  --window-size=1280,720 --screenshot=/tmp/arbitrium-boot.png \
-  http://localhost:5173/
+brave --headless=new --disable-gpu --no-sandbox --enable-unsafe-swiftshader \
+  --disable-background-timer-throttling --disable-backgrounding-occluded-windows \
+  --disable-renderer-backgrounding \
+  --enable-logging=stderr --v=0 --window-size=1280,720 \
+  --screenshot=/tmp/arbitrium-boot.png http://localhost:5173/
+
+# For an input-driven check, add --remote-debugging-port=9222 instead of
+# --screenshot, then drive it over CDP (Input.dispatchKeyEvent +
+# Page.captureScreenshot). See the caveats below before asserting anything.
 ```
 
-It passes only when **all** of these hold:
+Headless Chromium renders on demand, which constrains what this pass can prove:
+
+- The page is backgrounded after a few seconds and `requestAnimationFrame` drops to
+  zero, freezing Phaser's loop. Keep it awake with the three `--disable-*`
+  backgrounding flags above **and** a CDP `Emulation.setFocusEmulationEnabled` call.
+- Even awake, software WebGL cannot hold 60fps, and `TimeStep.smoothDelta` clamps
+  oversized deltas to the last sane value. The game therefore runs in **slow motion**:
+  simulated time advances slower than wall-clock. **Never assert an absolute distance,
+  speed, or duration from a headless run** — the number will be short and it means
+  nothing about the build.
+- CDP virtual time (`Emulation.setVirtualTimePolicy`) does not drive Phaser's frame
+  loop at all. It is not a workaround.
+
+So the automated pass verifies presence and direction, not magnitude. It passes only
+when **all** of these hold:
 
 - The process exits `0` and writes a screenshot.
 - The console shows the expected `Phaser v<version> (WebGL | Web Audio)` banner —
@@ -256,8 +275,15 @@ It passes only when **all** of these hold:
   is what keeps the headless software-WebGL notice out of that count; if a warning
   appears, fix it or record why it is benign in the sprint's commit message.
 - The screenshot shows what the sprint built, not an empty canvas.
+- Where the sprint added input or motion, driving it over CDP moves the right thing in
+  the right **direction**, stops when the input stops, and never leaves the canvas.
 
-Manual pass — headless cannot judge feel, and feel is where this game lives. Open
+Screenshots are the reliable probe. Reading pixels back from the WebGL canvas returns
+an empty buffer, since the context has no `preserveDrawingBuffer`; measure the
+captured PNG instead (ImageMagick `-fuzz` on a known sprite colour, then `-trim`).
+
+Manual pass — this is where speed, timing, and feel are actually checked, because
+headless cannot measure them and feel is where this game lives. Open
 the dev server and play the sprint's feature for a minute: input latency, whether
 the Parley slowdown reads as a real cost, whether spawns look tactically placed.
 Anything that feels wrong is a finding even when every test is green.

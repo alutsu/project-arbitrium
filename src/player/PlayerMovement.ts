@@ -8,36 +8,37 @@ export interface MovementIntent {
 }
 
 const STOPPED: Vector2 = { x: 0, y: 0 };
-const MAX_AXIS_MAGNITUDE = 1;
+const MILLISECONDS_PER_SECOND = 1000;
 const FULL_SPEED_FACTOR = 1;
 
 /**
- * Pure movement rules: axis input becomes a velocity. Phaser-free by design so the
- * rules are unit-testable (CLAUDE.md 3.5).
+ * Pure movement rules: axis input becomes the distance to travel this frame.
+ * Phaser-free by design so the rules are unit-testable (CLAUDE.md 3.5).
  */
 export class PlayerMovement {
   public constructor(private readonly stats: PlayerStats) {}
 
   /**
-   * Returns velocity in pixels per second. Deliberately NOT delta-scaled: Arcade
-   * Physics integrates velocity against the frame delta itself, so scaling here
-   * would apply the delta twice.
+   * Returns the displacement to apply this frame, in pixels, scaled by the frame
+   * delta so travel speed is frame-rate independent (CLAUDE.md 5).
+   *
+   * @param deltaMs - Milliseconds elapsed since the previous frame.
    */
-  public resolveVelocity(intent: MovementIntent): Vector2 {
+  public resolveDisplacement(intent: MovementIntent, deltaMs: number): Vector2 {
     const magnitude = Math.hypot(intent.moveAxes.x, intent.moveAxes.y);
     if (magnitude === 0) {
       return STOPPED;
     }
 
     const speed = this.currentSpeed(intent.isParleying);
-    // Clamping rather than always normalizing keeps a diagonal from outrunning a
-    // cardinal, while still letting a partial analog tilt move at partial speed.
-    const clamp =
-      magnitude > MAX_AXIS_MAGNITUDE ? MAX_AXIS_MAGNITUDE / magnitude : FULL_SPEED_FACTOR;
+    const deltaSeconds = deltaMs / MILLISECONDS_PER_SECOND;
+    // Dividing by the magnitude normalizes the input to unit length, so a diagonal
+    // travels exactly as far as a cardinal rather than sqrt(2) times as far.
+    const step = (speed * deltaSeconds) / magnitude;
 
     return {
-      x: intent.moveAxes.x * clamp * speed,
-      y: intent.moveAxes.y * clamp * speed,
+      x: intent.moveAxes.x * step,
+      y: intent.moveAxes.y * step,
     };
   }
 

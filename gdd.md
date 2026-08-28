@@ -229,7 +229,8 @@ The `EncounterDirector` consults the JSON `LootTable` of enemies.
 | --- | --- | --- |
 | Base Move Speed | 220 px/sec | Crosses the 1280x720 logical room in ~6 seconds; fast enough to reposition, slow enough that Tier 1 projectiles stay dodgeable. First-pass value, to be revisited in Sprint 10 (Economic Balancing). |
 | Parley Movement Penalty | 30% | The physical cost of holding Parley (see 2.2.1). |
-| Diagonal Handling | Input magnitude clamped to 1 | A diagonal must not outrun a cardinal, while a partial analog tilt still moves at partial speed. |
+| Diagonal Handling | Input normalized to unit length | A diagonal must not outrun a cardinal. Normalizing rather than clamping means any non-zero input travels at full speed, including a partial analog tilt. |
+| Movement Application | Delta-scaled displacement per frame | Movement is computed as distance-this-frame and applied to the body position, with the Arcade body in `directControl` so it derives its own velocity and still resolves collisions and world bounds. |
 | Logical Resolution | 1280x720 | Fixed world units; the canvas is scaled to fit the window. |
 
 ---

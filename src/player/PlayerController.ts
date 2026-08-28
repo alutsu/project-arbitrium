@@ -14,9 +14,10 @@ export class PlayerController {
     private readonly actor: PlayerActor,
   ) {}
 
-  public update(): void {
+  /** @param deltaMs - Milliseconds elapsed since the previous frame. */
+  public update(deltaMs: number): void {
     const intent = this.input.readIntent();
-    this.actor.setVelocity(this.movement.resolveVelocity(intent));
+    this.actor.moveBy(this.movement.resolveDisplacement(intent, deltaMs));
 
     const position = this.actor.position;
     // Aiming exactly at your own feet has no direction; keep the current facing
