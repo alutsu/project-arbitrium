@@ -560,6 +560,33 @@ Two things worth knowing before tuning any of it:
 Sparks, floating numbers and projectiles are all pooled: a fight produces these
 constantly, and a roguelite cannot afford to allocate per frame.
 
+### 9.4 Sound
+
+Audio appears nowhere in the roadmap in 7 — Sprint 9 asked for particles and camera
+shake only — so this was added alongside it rather than to a plan.
+
+The repository ships no audio assets. The effects are **synthesised** by
+`tools/generate-sounds.mjs` and rebuilt with `npm run sounds`, so they are readable and
+editable as code rather than committed as unexplained binaries. The noise source is
+seeded, so regenerating produces byte-identical files and never appears as a spurious
+diff. Six files, about 53 KB in total.
+
+| Effect | Plays when | Character |
+| --- | --- | --- |
+| `shot` | The weapon fires, melee or ranged | Descending chirp, 900 to 240 Hz |
+| `hit` | A hit connects | Dry noise smack |
+| `kill` | An enemy dies | Falling three-note figure with a noise tail |
+| `hurt` | The player is hit | Low sweep, 220 to 70 Hz |
+| `bargain` | A Parley settles | Two rising tones, a deal struck |
+| `purchase` | Gold changes hands at the pedestal or the Forge | Rising triad |
+
+Each effect carries a volume and a **minimum gap** between plays. The gap is not
+decoration: a shotgun lands five pellets in a single frame and the pistol fires four
+times a second, so without a floor `hit` and `shot` become a buzz rather than a sound.
+
+Nothing fails if audio is unavailable. Phaser hands back a no-op sound manager, and a
+browser that has not yet seen a user gesture simply plays nothing until it has.
+
 ## 10. Conclusion
 
 **Project Arbitrium** challenges the genre's status quo. The **Liquidation Protocol** (Sell vs Swap) and **Forge System** give players agency over the randomness, converting "bad RNG" into currency for upgrades. The **Bargain** mechanic remains the unique selling point, creating a tension between immediate survival (Bargaining) and long-term power (Fighting for Gold to spend at the Forge). The use of the **Phaser 4 framework** ensures a lightweight, highly accessible, and easily deployable web-first experience without sacrificing 2D combat polish.

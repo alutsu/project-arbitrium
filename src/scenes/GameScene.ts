@@ -29,6 +29,8 @@ import { angleBetween } from '../math/angleBetween';
 import { SwingView } from '../ui/SwingView';
 import { DefeatView } from '../ui/DefeatView';
 import { FeedbackView } from '../ui/FeedbackView';
+import { GameSounds } from '../audio/GameSounds';
+import { SOUND_KEYS } from '../audio/SoundKey';
 import { NavigationGrid } from '../dungeon/NavigationGrid';
 import type { EnemyAction } from '../enemy/EnemyBrain';
 import type { Enemy as EnemyEntity } from '../enemy/Enemy';
@@ -154,6 +156,7 @@ export class GameScene extends Phaser.Scene {
   private swingView: SwingView | null = null;
   private defeatView: DefeatView | null = null;
   private feedback: FeedbackView | null = null;
+  private sounds: GameSounds | null = null;
   private enemyCollider: Phaser.Physics.Arcade.Collider | null = null;
   private readonly analyzer = new RoomAnalyzer();
   private director: EncounterDirector | null = null;
@@ -182,6 +185,9 @@ export class GameScene extends Phaser.Scene {
     this.load.json(DATA_KEYS.encounter, 'data/encounter.json');
     for (const id of ROOM_TEMPLATE_IDS) {
       this.load.json(roomCacheKey(id), `data/rooms/${id}.json`);
+    }
+    for (const key of SOUND_KEYS) {
+      this.load.audio(key, `audio/${key}.wav`);
     }
   }
 
@@ -250,6 +256,7 @@ export class GameScene extends Phaser.Scene {
     this.swingView = new SwingView(this, DEPTH_PARLEY);
     this.defeatView = new DefeatView(this, DEPTH_HUD);
     this.feedback = new FeedbackView(this, DEPTH_FEEDBACK, SPARK_TEXTURE_KEY);
+    this.sounds = new GameSounds(this.sound);
     this.hud = new ResourceHud(this, DEPTH_HUD);
 
     this.enterRoom(this.dungeon.start, null);
@@ -270,6 +277,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.roomElapsedMs += delta;
+    this.sounds?.tick(delta);
 
     // Read once per frame and share it: a second read would consume the edge-detected
     // one-shot actions.
@@ -293,6 +301,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.driveEnemies(frame, actor.position, delta);
+    if (frame.status.kind === 'completed') {
+      this.sounds?.play('bargain');
+    }
     this.swingView?.render(delta);
     this.feedback?.render(delta);
     this.parleyView?.render(frame, actor.position.x, actor.position.y);
@@ -393,6 +404,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.feedback?.playerHurt(damage);
+    this.sounds?.play('hurt');
     parley.replaceResources(parley.resources.loseVitality(damage));
   }
 
@@ -421,6 +433,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private realise(attack: Attack, origin: GridCoordinate, pool: ProjectilePool): void {
+    if (attack.kind !== 'none') {
+      this.sounds?.play('shot');
+    }
     if (attack.kind === 'ranged') {
       for (const angle of attack.angles) {
         pool.fire({
@@ -464,11 +479,13 @@ export class GameScene extends Phaser.Scene {
     }
     for (const hit of struck) {
       this.feedback?.hit(hit.at, hit.damage);
+      this.sounds?.play('hit');
       const enemy = this.enemies.find((candidate) => candidate === hit.target);
       if (enemy === undefined || enemy.isAlive) {
         continue;
       }
       this.feedback?.kill(enemy.position, enemy.data.goldReward);
+      this.sounds?.play('kill');
       parley.replaceResources(parley.resources.gainGold(enemy.data.goldReward));
       parley.remove(enemy);
       this.enemies = this.enemies.filter((candidate) => candidate !== enemy);
@@ -548,6 +565,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.weaponSlot = result.slot;
     parley.replaceResources(result.resources);
+    this.sounds?.play('purchase');
     this.progress.markLiquidated(room.coordinate);
     this.offered = null;
     this.pedestalView?.hide();
@@ -601,6 +619,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.weaponSlot = receipt.value.slot;
     parley.replaceResources(receipt.value.resources);
+    this.sounds?.play('purchase');
     this.forgeNotice = null;
   }
 
@@ -887,6 +906,7 @@ export class GameScene extends Phaser.Scene {
     this.swingView = null;
     this.defeatView = null;
     this.feedback = null;
+    this.sounds = null;
     this.enemyCollider = null;
     this.currentSealed = null;
     this.enemies = [];
