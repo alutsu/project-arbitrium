@@ -231,6 +231,41 @@ violation (§4.5 of this file) — the roadmap exists so that work stays sequenc
 - Rendering and physics are not unit-tested; keep the untestable surface thin
   enough that this is acceptable.
 
+### 6.1 End-of-sprint browser verification
+
+Unit tests cover the rules; they say nothing about whether the game still boots.
+**Every sprint closes with an end-to-end run in a real browser** before the sprint
+is called done. Use **Brave** (any Chromium-based binary takes the same flags).
+
+Automated pass — start the dev server, then drive it headless:
+
+```bash
+npm run dev &                       # or: npm run build && npm run preview
+brave --headless --disable-gpu --no-sandbox --enable-unsafe-swiftshader \
+  --virtual-time-budget=6000 --enable-logging=stderr --v=0 \
+  --window-size=1280,720 --screenshot=/tmp/arbitrium-boot.png \
+  http://localhost:5173/
+```
+
+It passes only when **all** of these hold:
+
+- The process exits `0` and writes a screenshot.
+- The console shows the expected `Phaser v<version> (WebGL | Web Audio)` banner —
+  a Canvas fallback means the renderer regressed.
+- **Zero** console errors, warnings, or uncaught exceptions. `--enable-unsafe-swiftshader`
+  is what keeps the headless software-WebGL notice out of that count; if a warning
+  appears, fix it or record why it is benign in the sprint's commit message.
+- The screenshot shows what the sprint built, not an empty canvas.
+
+Manual pass — headless cannot judge feel, and feel is where this game lives. Open
+the dev server and play the sprint's feature for a minute: input latency, whether
+the Parley slowdown reads as a real cost, whether spawns look tactically placed.
+Anything that feels wrong is a finding even when every test is green.
+
+Record the outcome of both passes in the sprint's closing commit message. A failing
+browser run blocks the sprint from being called done, exactly as a failing unit test
+blocks a change.
+
 ---
 
 ## 7. Definition of Done
@@ -245,3 +280,8 @@ A change is complete only when all of these hold:
 6. No `any`, no `!`, no `@ts-ignore`, no magic numbers, no dead code.
 7. New behavior is data-driven where the GDD says it should be.
 8. Nothing outside the requested scope was changed.
+
+For a change that closes a sprint, one more holds:
+
+9. The end-to-end browser verification in §6.1 passed, both automated and manual,
+   and its outcome is recorded in the closing commit message.
