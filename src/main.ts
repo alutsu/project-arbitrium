@@ -8,7 +8,12 @@ const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   width: GAME_DISPLAY.width,
   height: GAME_DISPLAY.height,
   backgroundColor: GAME_DISPLAY.backgroundColor,
-  pixelArt: true,
+  // Crisp nearest-neighbour textures without pixelArt's roundPixels, which snaps
+  // rendered positions to whole pixels and turns smooth sub-pixel travel into an
+  // uneven 2px/3px shuffle whenever the player moves.
+  antialias: false,
+  antialiasGL: false,
+  roundPixels: false,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
