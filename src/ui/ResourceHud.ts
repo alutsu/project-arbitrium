@@ -19,7 +19,8 @@ export class ResourceHud {
   private readonly readout: Phaser.GameObjects.Text;
 
   public constructor(scene: Phaser.Scene, depth: number) {
-    this.readout = scene.add.text(MARGIN, MARGIN, '', STYLE).setDepth(depth);
+    // Fixed to the viewport, so a camera kick shakes the world and not the readout.
+    this.readout = scene.add.text(MARGIN, MARGIN, '', STYLE).setDepth(depth).setScrollFactor(0);
   }
 
   public render(state: PlayerState, roomLabel: string, weaponLabel: string): void {

@@ -21,13 +21,14 @@ import type { WeaponData } from '../data/WeaponData';
 import { WeaponSlot } from '../weapon/WeaponSlot';
 import { PedestalView } from '../ui/PedestalView';
 import { AttackCooldown } from '../combat/AttackCooldown';
-import type { Damageable } from '../combat/Damageable';
+import type { ProjectileHit } from '../combat/ProjectilePool';
 import { isWithinSwing } from '../combat/isWithinSwing';
 import { ProjectilePool } from '../combat/ProjectilePool';
 import { WeaponController, type Attack } from '../combat/WeaponController';
 import { angleBetween } from '../math/angleBetween';
 import { SwingView } from '../ui/SwingView';
 import { DefeatView } from '../ui/DefeatView';
+import { FeedbackView } from '../ui/FeedbackView';
 import { NavigationGrid } from '../dungeon/NavigationGrid';
 import type { EnemyAction } from '../enemy/EnemyBrain';
 import type { Enemy as EnemyEntity } from '../enemy/Enemy';
@@ -84,6 +85,10 @@ const ENEMY_PLACEHOLDER_COLORS: readonly number[] = [
 const HASH_SEED = 7;
 const HASH_MULTIPLIER = 31;
 
+const SPARK_TEXTURE_KEY = 'spark-placeholder';
+const SPARK_SIZE = 4;
+const SPARK_COLOR = 0xfff1c9;
+
 const ENEMY_PROJECTILE_TEXTURE_KEY = 'enemy-projectile-placeholder';
 const ENEMY_PROJECTILE_COLOR = 0xff8f6b;
 
@@ -107,6 +112,8 @@ const DEPTH_TERRAIN = 0;
 const DEPTH_PEDESTAL = 5;
 const DEPTH_ENTITIES = 10;
 const DEPTH_PARLEY = 20;
+/** Above the world, below the readouts: a screen flash must not hide the HUD. */
+const DEPTH_FEEDBACK = 25;
 const DEPTH_HUD = 30;
 
 /** Salt so the weapon offered in a room draws from a different stream than its enemies. */
@@ -146,6 +153,7 @@ export class GameScene extends Phaser.Scene {
   private weaponController: WeaponController | null = null;
   private swingView: SwingView | null = null;
   private defeatView: DefeatView | null = null;
+  private feedback: FeedbackView | null = null;
   private enemyCollider: Phaser.Physics.Arcade.Collider | null = null;
   private readonly analyzer = new RoomAnalyzer();
   private director: EncounterDirector | null = null;
@@ -241,6 +249,7 @@ export class GameScene extends Phaser.Scene {
     this.weaponController = new WeaponController(new AttackCooldown());
     this.swingView = new SwingView(this, DEPTH_PARLEY);
     this.defeatView = new DefeatView(this, DEPTH_HUD);
+    this.feedback = new FeedbackView(this, DEPTH_FEEDBACK, SPARK_TEXTURE_KEY);
     this.hud = new ResourceHud(this, DEPTH_HUD);
 
     this.enterRoom(this.dungeon.start, null);
@@ -268,6 +277,9 @@ export class GameScene extends Phaser.Scene {
     if (parley.state.resources.isDefeated) {
       this.defeatView?.show();
       actor.setVelocity({ x: 0, y: 0 });
+      // Keep the feedback ticking: returning before this left the red damage flash
+      // painted over the screen permanently.
+      this.feedback?.render(delta);
       return;
     }
     controller.update(intent, { speedMultiplier: parley.state.pride.speedMultiplier });
@@ -282,6 +294,7 @@ export class GameScene extends Phaser.Scene {
 
     this.driveEnemies(frame, actor.position, delta);
     this.swingView?.render(delta);
+    this.feedback?.render(delta);
     this.parleyView?.render(frame, actor.position.x, actor.position.y);
     this.hud?.render(
       parley.state,
@@ -322,6 +335,7 @@ export class GameScene extends Phaser.Scene {
     const negotiating = new Set(frame.visible.map((entry) => entry.bargainable));
 
     for (const enemy of this.enemies) {
+      enemy.tickFlash(deltaMs);
       if (!enemy.isAlive) {
         continue;
       }
@@ -378,6 +392,7 @@ export class GameScene extends Phaser.Scene {
     if (parley === null) {
       return;
     }
+    this.feedback?.playerHurt(damage);
     parley.replaceResources(parley.resources.loseVitality(damage));
   }
 
@@ -424,26 +439,36 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.swingView?.flash(attack.swing);
-    const hit = this.enemies.filter(
+    const reached = this.enemies.filter(
       (enemy) => enemy.isAlive && isWithinSwing(attack.swing, enemy.position),
     );
-    for (const enemy of hit) {
+    const landed: ProjectileHit[] = reached.map((enemy) => ({
+      target: enemy,
+      damage: attack.damage,
+      at: enemy.position,
+    }));
+    for (const enemy of reached) {
       enemy.takeHit(attack.damage, attack.knockback, origin);
     }
-    this.collectSpoils(hit);
+    this.collectSpoils(landed);
   }
 
-  /** A killed enemy pays gold; a bargained one never does (GDD 2.2.2, 8.3). */
-  private collectSpoils(struck: readonly Damageable[]): void {
+  /**
+   * Shows each hit, and pays out for anything it killed. A killed enemy pays Gold; a
+   * bargained one never does (GDD 2.2.2, 8.3).
+   */
+  private collectSpoils(struck: readonly ProjectileHit[]): void {
     const parley = this.parleySystem;
     if (parley === null) {
       return;
     }
-    for (const target of struck) {
-      const enemy = this.enemies.find((candidate) => candidate === target);
+    for (const hit of struck) {
+      this.feedback?.hit(hit.at, hit.damage);
+      const enemy = this.enemies.find((candidate) => candidate === hit.target);
       if (enemy === undefined || enemy.isAlive) {
         continue;
       }
+      this.feedback?.kill(enemy.position, enemy.data.goldReward);
       parley.replaceResources(parley.resources.gainGold(enemy.data.goldReward));
       parley.remove(enemy);
       this.enemies = this.enemies.filter((candidate) => candidate !== enemy);
@@ -805,6 +830,10 @@ export class GameScene extends Phaser.Scene {
     graphics.generateTexture(PLAYER_TEXTURE_KEY, PLAYER_TEXTURE_SIZE, PLAYER_TEXTURE_SIZE);
 
     graphics.clear();
+    graphics.fillStyle(SPARK_COLOR).fillRect(0, 0, SPARK_SIZE, SPARK_SIZE);
+    graphics.generateTexture(SPARK_TEXTURE_KEY, SPARK_SIZE, SPARK_SIZE);
+
+    graphics.clear();
     graphics
       .fillStyle(ENEMY_PROJECTILE_COLOR)
       .fillCircle(PROJECTILE_RADIUS, PROJECTILE_RADIUS, PROJECTILE_RADIUS);
@@ -832,6 +861,7 @@ export class GameScene extends Phaser.Scene {
     this.enemyProjectiles?.destroy();
     this.swingView?.destroy();
     this.defeatView?.destroy();
+    this.feedback?.destroy();
     this.enemyCollider?.destroy();
     this.roomView?.destroy();
     this.hud?.destroy();
@@ -856,6 +886,7 @@ export class GameScene extends Phaser.Scene {
     this.weaponController = null;
     this.swingView = null;
     this.defeatView = null;
+    this.feedback = null;
     this.enemyCollider = null;
     this.currentSealed = null;
     this.enemies = [];

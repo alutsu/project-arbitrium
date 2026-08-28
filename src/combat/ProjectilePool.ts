@@ -18,6 +18,13 @@ export interface Shot {
   readonly hitRadiusPixels?: number;
 }
 
+/** A projectile connecting: enough detail to both settle it and show it. */
+export interface ProjectileHit {
+  readonly target: Damageable;
+  readonly damage: number;
+  readonly at: { readonly x: number; readonly y: number };
+}
+
 /** What a projectile can run into. */
 export interface ProjectileWorld {
   isSolidAt(x: number, y: number): boolean;
@@ -70,9 +77,9 @@ export class ProjectilePool {
   }
 
   /** Advances every projectile and returns whatever they hit this frame. */
-  public update(deltaMs: number, world: ProjectileWorld): readonly Damageable[] {
+  public update(deltaMs: number, world: ProjectileWorld): readonly ProjectileHit[] {
     const seconds = deltaMs / MILLISECONDS_PER_SECOND;
-    const struck: Damageable[] = [];
+    const struck: ProjectileHit[] = [];
 
     for (let index = this.flights.length - 1; index >= SPENT; index--) {
       const flight = this.flights[index];
@@ -84,7 +91,11 @@ export class ProjectilePool {
         continue;
       }
       if (hit !== 'stopped') {
-        struck.push(hit);
+        struck.push({
+          target: hit,
+          damage: flight.damage,
+          at: { x: flight.sprite.x, y: flight.sprite.y },
+        });
       }
       flight.sprite.setActive(false).setVisible(false);
       this.flights.splice(index, 1);

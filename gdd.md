@@ -531,6 +531,30 @@ While Phaser uses a classical inheritance model for GameObjects, we will use a c
 
 ---
 
+### 9.3 Feedback and Juice
+
+Sprint 9's brief in 7 is "Particle Emitters, Camera Shake". The work was aimed at
+**legibility** rather than decoration: before it, damage was invisible unless the player
+happened to be watching a number in the HUD.
+
+| Event | What the player sees |
+| --- | --- |
+| A hit lands | A spark burst at the point of impact, the damage as a rising number, and the target flashing white for 90ms |
+| Something dies | A larger burst, and the Gold it paid as a rising number |
+| The player is hit | A camera kick scaled to the damage, and a red flash over the screen |
+
+Two things worth knowing before tuning any of it:
+
+* **Shake intensity is a fraction of the viewport, not a pixel count.** An intensity of
+  0.016 threw the world about twenty pixels and shoved the room over the HUD. The range
+  is now 0.002 to 0.007, roughly two to nine pixels, scaled by damage so a Grunt's 7 and
+  the Floor Warden's 14 do not feel alike.
+* **The HUD, the defeat text and the red flash are fixed to the viewport.** Everything
+  else shakes. A flash that slid with the camera showed its own edges.
+
+Sparks, floating numbers and projectiles are all pooled: a fight produces these
+constantly, and a roguelite cannot afford to allocate per frame.
+
 ## 10. Conclusion
 
 **Project Arbitrium** challenges the genre's status quo. The **Liquidation Protocol** (Sell vs Swap) and **Forge System** give players agency over the randomness, converting "bad RNG" into currency for upgrades. The **Bargain** mechanic remains the unique selling point, creating a tension between immediate survival (Bargaining) and long-term power (Fighting for Gold to spend at the Forge). The use of the **Phaser 4 framework** ensures a lightweight, highly accessible, and easily deployable web-first experience without sacrificing 2D combat polish.

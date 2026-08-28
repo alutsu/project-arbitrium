@@ -1,4 +1,4 @@
-import type Phaser from 'phaser';
+import Phaser from 'phaser';
 import type { Bargainable } from '../bargain/Bargainable';
 import type { BargainDemand } from '../bargain/BargainDemand';
 import type { Damageable } from '../combat/Damageable';
@@ -10,6 +10,10 @@ import { EnemyBrain } from './EnemyBrain';
 const DEAD = 0;
 /** Enough drag that a knocked-back enemy settles rather than sliding forever. */
 const DRAG = 900;
+/** How long a struck enemy shows white, so a hit reads even at a glance. */
+const FLASH_MS = 90;
+const FLASH_COLOR = 0xffffff;
+const SPENT = 0;
 
 /**
  * An enemy present in the room. It holds its sprite by composition rather than
@@ -34,6 +38,7 @@ export class Enemy implements Bargainable, Damageable {
   private readonly sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
   private vitality: number;
   private retired = false;
+  private flashRemainingMs = SPENT;
 
   public constructor(spec: EnemySpec) {
     this.sprite = spec.sprite;
@@ -64,6 +69,17 @@ export class Enemy implements Bargainable, Damageable {
   }
 
   /** Jumps to a new position, for the Blink-Stalker (GDD 5.1). */
+  /** Clears the hit flash once it has run its course. */
+  public tickFlash(deltaMs: number): void {
+    if (this.flashRemainingMs <= SPENT) {
+      return;
+    }
+    this.flashRemainingMs -= deltaMs;
+    if (this.flashRemainingMs <= SPENT) {
+      this.sprite.clearTint();
+    }
+  }
+
   public blinkTo(destination: Vector2): void {
     this.sprite.setVelocity(0, 0);
     this.sprite.setPosition(destination.x, destination.y);
@@ -78,6 +94,9 @@ export class Enemy implements Bargainable, Damageable {
       return;
     }
     this.vitality -= damage;
+    this.flashRemainingMs = FLASH_MS;
+    // Phaser 4 retired setTintFill in favour of a tint plus an explicit mode.
+    this.sprite.setTint(FLASH_COLOR).setTintMode(Phaser.TintModes.FILL);
     const away = angleBetween(from, this.position);
     this.sprite.setVelocity(Math.cos(away) * knockback, Math.sin(away) * knockback);
     if (this.vitality <= DEAD) {

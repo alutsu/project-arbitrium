@@ -23,11 +23,13 @@ export class DefeatView {
       .text(x, y, TITLE, TITLE_STYLE)
       .setOrigin(CENTRE)
       .setDepth(depth)
+      .setScrollFactor(0)
       .setVisible(false);
     this.subtitle = scene.add
       .text(x, y + SUBTITLE_OFFSET_Y, SUBTITLE, SUBTITLE_STYLE)
       .setOrigin(CENTRE)
       .setDepth(depth)
+      .setScrollFactor(0)
       .setVisible(false);
   }
 
