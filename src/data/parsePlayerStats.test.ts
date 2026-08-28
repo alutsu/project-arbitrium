@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parsePlayerStats } from './parsePlayerStats';
 
-const STATS = { moveSpeedPixelsPerSecond: 220, parleyMovementPenalty: 0.3 };
+const STATS = {
+  moveSpeedPixelsPerSecond: 220,
+  parleyMovementPenalty: 0.3,
+  startingGold: 120,
+  maxVitality: 100,
+};
 
 const errorOf = (raw: unknown): string => {
   const outcome = parsePlayerStats(raw);

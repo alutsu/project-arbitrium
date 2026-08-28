@@ -1,4 +1,6 @@
 {
   "moveSpeedPixelsPerSecond": 220,
-  "parleyMovementPenalty": 0.3
+  "parleyMovementPenalty": 0.3,
+  "startingGold": 120,
+  "maxVitality": 100
 }

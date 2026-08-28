@@ -1,21 +1,20 @@
-import type { InputSource } from '../input/InputSource';
+import type { InputIntent } from '../input/InputIntent';
 import type { Vector2 } from '../math/Vector2';
 import type { PlayerActor } from './PlayerActor';
 import type { PlayerMovement } from './PlayerMovement';
 
 /**
- * Drives the player actor from input, once per frame. Phaser-free (CLAUDE.md 3.5):
- * it talks to `InputSource` and `PlayerActor`, never to a scene or a sprite.
+ * Drives the player actor from this frame's intent. Phaser-free (CLAUDE.md 3.5), and
+ * it does not read input itself: the scene reads once per frame and shares the intent,
+ * because Parley needs the same snapshot and edge-detected presses survive only one read.
  */
 export class PlayerController {
   public constructor(
-    private readonly input: InputSource,
     private readonly movement: PlayerMovement,
     private readonly actor: PlayerActor,
   ) {}
 
-  public update(): void {
-    const intent = this.input.readIntent();
+  public update(intent: InputIntent): void {
     this.actor.setVelocity(this.movement.resolveVelocity(intent));
 
     const position = this.actor.position;

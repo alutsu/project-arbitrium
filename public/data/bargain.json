@@ -1,0 +1,11 @@
+{
+  "aggroDelayMs": 1500,
+  "lateCostMultiplier": 1.5,
+  "holdDurationMs": 900,
+  "sphereRadiusPixels": 170,
+  "demands": [
+    { "tier": "Normal", "cost": { "kind": "Gold", "fractionOfGold": 0.15 } },
+    { "tier": "Normal", "cost": { "kind": "Vitality", "damage": 8 } },
+    { "tier": "Normal", "cost": { "kind": "Gold", "fractionOfGold": 0.25 } }
+  ]
+}

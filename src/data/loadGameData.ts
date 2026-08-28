@@ -2,6 +2,7 @@ import { err, type Result } from '../core/Result';
 import { DATA_KEYS } from './dataKeys';
 import { GameDatabase } from './GameDatabase';
 import type { JsonSource } from './JsonSource';
+import { parseBargainData } from './parseBargainData';
 import { parsePlayerStats } from './parsePlayerStats';
 import { parseUpgrades } from './parseUpgrades';
 import { parseWeapons } from './parseWeapons';
@@ -20,5 +21,13 @@ export function loadGameData(source: JsonSource): Result<GameDatabase> {
   const playerStats = parsePlayerStats(source.read(DATA_KEYS.playerStats));
   if (!playerStats.ok) return err(playerStats.error);
 
-  return GameDatabase.create(weapons.value, upgrades.value, playerStats.value);
+  const bargain = parseBargainData(source.read(DATA_KEYS.bargain));
+  if (!bargain.ok) return err(bargain.error);
+
+  return GameDatabase.create({
+    weapons: weapons.value,
+    upgrades: upgrades.value,
+    playerStats: playerStats.value,
+    bargain: bargain.value,
+  });
 }

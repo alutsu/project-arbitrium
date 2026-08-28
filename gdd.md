@@ -57,6 +57,8 @@ The user query emphasizes a desire to be different from *Binding of Isaac* by al
 In an action roguelite, negotiation cannot be a menu-driven conversation; it must be diegetic and fast-paced.
 
 * **Activation:** The player holds a dedicated "Parley" button. This projects a visual radius (The Sphere of Influence).
+* **Acceptance:** Holding is the negotiation. Parley must be held for `holdDurationMs` with the enemy inside the Sphere; the cost is charged and the enemy flees the moment the hold completes. Releasing early, or drifting so a different enemy becomes the nearest, starts the hold over. The exposure during that hold — at reduced speed, unable to shoot — is the risk being traded.
+* **One at a time:** Every enemy in the Sphere shows its Desire Icon, but a hold settles only with the **nearest**. Clearing a room by mercy therefore costs several holds, keeping mass bargaining expensive in exposure as well as resources.
 * **The Cost:** While the button is held, the player cannot shoot. Their movement speed is reduced by 30%. This makes attempting to bargain a physical risk.
 * **The Demand:** Enemies display a "Desire Icon" above their heads.
 * *Normal Enemies:* Simple demands (percentage of current Gold, specific ammo type, or a small HP sacrifice).
@@ -211,6 +213,7 @@ export interface UpgradeData {
 | `public/data/weapons.json` | `weapons` | `WeaponData[]` |
 | `public/data/upgrades.json` | `upgrades` | `UpgradeData[]` |
 | `public/data/player.json` | `playerStats` | Movement values from 3.3.1 |
+| `public/data/bargain.json` | `bargain` | Parley constants from 4.1.3, and the Desires enemies may hold |
 
 Each is parsed by a validator returning `Result<T, string>`. A failure names the file, the index and the offending field; the scene throws on it rather than starting with half-valid data.
 
@@ -244,7 +247,7 @@ The `EncounterDirector` consults the JSON `LootTable` of enemies.
 * **Actions:** `Move` (WASD/Analog), `Aim` (Mouse pointer/Right stick), `Attack` (Click), `Bargain` (Hold Spacebar/Trigger), `Interact` (E), `Sell` (R). Bound once from `this.input.keyboard` and the scene's active pointer.
 * **Architecture:** Devices sit behind an `InputSource` that reports one frame of intent as an `InputIntent` snapshot: held actions (Move, Aim, Attack, Bargain) plus edge-detected one-shots (Interact, Sell). The `PlayerController` consumes that snapshot and drives a narrow `PlayerActor` interface, so it neither reads Phaser input nor owns a sprite. Held actions are polled per frame rather than event-driven, which is what lets Attack and Bargain be sustained without listener bookkeeping.
 
-#### 3.3.1 Player Controller Constants
+#### 3.3.1 Player Constants
 
 | Constant | Value | Rationale |
 | --- | --- | --- |
@@ -253,6 +256,8 @@ The `EncounterDirector` consults the JSON `LootTable` of enemies.
 | Diagonal Handling | Input normalized to unit length | A diagonal must not outrun a cardinal. Normalizing rather than clamping means any non-zero input travels at full speed, including a partial analog tilt. |
 | Movement Application | Velocity in px/sec, integrated by Arcade | The body integrates velocity against the frame delta, which is what makes travel frame-rate independent. Arcade steps once per rendered frame (`fixedStep: false`) instead of on a 60Hz accumulator, so motion stays even on high-refresh displays. |
 | Logical Resolution | 1280x720 | Fixed world units; the canvas is scaled to fit the window. |
+| Starting Gold | 120 | The pool a Gold demand takes its cut from (4.1.2). First-pass value. |
+| Max Vitality | 100 | Starting and maximum Vitality; the pool a Vitality demand draws down (4.1.2). |
 
 ---
 
@@ -275,6 +280,19 @@ The "Parley Phase" occurs at the start of the encounter.
 | Gold | Lose X% of Gold. | Strategic Risk: Can't afford Forge upgrades later. |
 | Vitality | Take flat damage. | Immediate Risk: Closer to death. |
 | Pride | Temp debuff (-Speed). | Skill Risk: Next room is harder. |
+
+A Parley is 100% survival (see 8.3), so a Vitality demand that would reduce the player to zero is **refused** rather than honoured: the enemy stays, and nothing is charged. A demand that leaves exactly 1 Vitality is allowed — that is the Run Saver case in 2.2.2.
+
+Pride is not yet implemented. A debuff scoped to "the next room" needs the dungeon topology from Sprint 4 to know when it expires; charging it before then would apply a penalty the game could never lift.
+
+#### 4.1.3 Parley Constants
+
+| Constant | Value | Rationale |
+| --- | --- | --- |
+| Aggro Delay | 1500 ms | The "Notice" window from 4.1.1, during which demands are at list price. |
+| Late Cost Multiplier | 1.5 | The +50% surcharge from 4.1.1, applied once the Aggro Delay lapses. |
+| Hold Duration | 900 ms | Long enough that holding is a real commitment, short enough to be worth it under pressure. First-pass value. |
+| Sphere of Influence Radius | 170 px | Reaches a nearby enemy without covering the arena, so positioning still matters. First-pass value. |
 
 ### 4.2 The Weapon Generation Algorithm
 

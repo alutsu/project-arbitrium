@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import shippedBargain from '../../public/data/bargain.json';
 import shippedPlayer from '../../public/data/player.json';
 import shippedUpgrades from '../../public/data/upgrades.json';
 import shippedWeapons from '../../public/data/weapons.json';
@@ -18,6 +19,7 @@ const shippedSource = new StubSource({
   [DATA_KEYS.weapons]: shippedWeapons,
   [DATA_KEYS.upgrades]: shippedUpgrades,
   [DATA_KEYS.playerStats]: shippedPlayer,
+  [DATA_KEYS.bargain]: shippedBargain,
 });
 
 describe('loadGameData', () => {
@@ -26,6 +28,13 @@ describe('loadGameData', () => {
     if (!outcome.ok) throw new Error(outcome.error);
     expect(outcome.value.weapons.length).toBeGreaterThan(0);
     expect(outcome.value.upgrades.length).toBeGreaterThan(0);
+  });
+
+  it('ships the Aggro Delay and late multiplier the GDD specifies (4.1.1)', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.value.bargain.settings.aggroDelayMs).toBe(1500);
+    expect(outcome.value.bargain.settings.lateCostMultiplier).toBe(1.5);
   });
 
   it('ships the movement values the GDD specifies (3.3.1)', () => {
@@ -47,6 +56,7 @@ describe('loadGameData', () => {
       [DATA_KEYS.weapons]: shippedWeapons,
       [DATA_KEYS.upgrades]: 'not an array',
       [DATA_KEYS.playerStats]: shippedPlayer,
+      [DATA_KEYS.bargain]: shippedBargain,
     });
     const outcome = loadGameData(broken);
     expect(outcome.ok).toBe(false);

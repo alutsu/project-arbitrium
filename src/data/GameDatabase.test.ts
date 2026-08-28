@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { BargainData } from '../bargain/BargainData';
 import { GameDatabase } from './GameDatabase';
 import type { PlayerStats } from './PlayerStats';
 import type { UpgradeData, UpgradeId } from './UpgradeData';
 import type { WeaponData, WeaponId } from './WeaponData';
 
-const STATS: PlayerStats = { moveSpeedPixelsPerSecond: 220, parleyMovementPenalty: 0.3 };
+const STATS: PlayerStats = {
+  moveSpeedPixelsPerSecond: 220,
+  parleyMovementPenalty: 0.3,
+  startingGold: 120,
+  maxVitality: 100,
+};
 
 const weapon = (id: string): WeaponData => ({
   id: id as WeaponId,
@@ -28,8 +34,21 @@ const upgrade = (id: string): UpgradeData => ({
   forbiddenTags: ['Ranged'],
 });
 
+const BARGAIN: BargainData = {
+  settings: {
+    aggroDelayMs: 1500,
+    lateCostMultiplier: 1.5,
+    holdDurationMs: 900,
+    sphereRadiusPixels: 170,
+  },
+  demands: [{ tier: 'Normal', cost: { kind: 'Gold', fractionOfGold: 0.15 } }],
+};
+
+const create = (weapons: WeaponData[], upgrades: UpgradeData[]) =>
+  GameDatabase.create({ weapons, upgrades, playerStats: STATS, bargain: BARGAIN });
+
 const build = (weapons: WeaponData[], upgrades: UpgradeData[]): GameDatabase => {
-  const outcome = GameDatabase.create(weapons, upgrades, STATS);
+  const outcome = create(weapons, upgrades);
   if (!outcome.ok) throw new Error(outcome.error);
   return outcome.value;
 };
@@ -40,6 +59,7 @@ describe('GameDatabase', () => {
     expect(database.weapon('sabre' as WeaponId).name).toBe('sabre');
     expect(database.upgrade('phase_blade' as UpgradeId).goldCost).toBe(40);
     expect(database.playerStats).toEqual(STATS);
+    expect(database.bargain.settings.aggroDelayMs).toBe(1500);
   });
 
   it('exposes every record for iteration', () => {
@@ -55,11 +75,11 @@ describe('GameDatabase', () => {
   });
 
   it('refuses to build with duplicate ids', () => {
-    const weapons = GameDatabase.create([weapon('sabre'), weapon('sabre')], [], STATS);
+    const weapons = create([weapon('sabre'), weapon('sabre')], []);
     expect(weapons.ok).toBe(false);
     if (!weapons.ok) expect(weapons.error).toContain('duplicate weapon id "sabre"');
 
-    const upgrades = GameDatabase.create([], [upgrade('grip'), upgrade('grip')], STATS);
+    const upgrades = create([], [upgrade('grip'), upgrade('grip')]);
     expect(upgrades.ok).toBe(false);
     if (!upgrades.ok) expect(upgrades.error).toContain('duplicate upgrade id "grip"');
   });

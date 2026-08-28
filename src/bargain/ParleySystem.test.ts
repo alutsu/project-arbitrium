@@ -1,0 +1,130 @@
+import { describe, expect, it } from 'vitest';
+import { PlayerResources } from '../player/PlayerResources';
+import type { Bargainable } from './Bargainable';
+import type { BargainDemand } from './BargainDemand';
+import { BargainService } from './BargainService';
+import type { BargainSettings } from './BargainSettings';
+import { ParleySession } from './ParleySession';
+import { ParleySystem } from './ParleySystem';
+
+const SETTINGS: BargainSettings = {
+  aggroDelayMs: 1500,
+  lateCostMultiplier: 1.5,
+  holdDurationMs: 900,
+  sphereRadiusPixels: 170,
+};
+
+const GOLD_DEMAND: BargainDemand = { tier: 'Normal', cost: { kind: 'Gold', fractionOfGold: 0.25 } };
+const PLAYER_AT = { x: 0, y: 0 };
+const IN_RANGE = { x: 40, y: 0 };
+const OUT_OF_RANGE = { x: 900, y: 0 };
+const EARLY_MS = 500;
+const LATE_MS = 5000;
+
+class TestEnemy implements Bargainable {
+  public fled = false;
+  public constructor(
+    public readonly position: { x: number; y: number },
+    public readonly demand: BargainDemand = GOLD_DEMAND,
+  ) {}
+  public flee(): void {
+    this.fled = true;
+  }
+}
+
+const systemWith = (enemies: TestEnemy[], gold = 200, vitality = 50): ParleySystem => {
+  const system = new ParleySystem({
+    session: new ParleySession(SETTINGS.holdDurationMs),
+    service: new BargainService(SETTINGS),
+    settings: SETTINGS,
+    resources: new PlayerResources(gold, vitality),
+  });
+  for (const enemy of enemies) system.add(enemy);
+  return system;
+};
+
+const parleyFor = (system: ParleySystem, frames: number, roomElapsedMs = EARLY_MS): void => {
+  for (let frame = 0; frame < frames; frame++) {
+    system.update({
+      isParleying: true,
+      playerPosition: PLAYER_AT,
+      deltaMs: 100,
+      roomElapsedMs,
+    });
+  }
+};
+
+describe('ParleySystem', () => {
+  it('shows no Desire Icons unless Parley is held', () => {
+    const system = systemWith([new TestEnemy(IN_RANGE)]);
+    const frame = system.update({
+      isParleying: false,
+      playerPosition: PLAYER_AT,
+      deltaMs: 100,
+      roomElapsedMs: EARLY_MS,
+    });
+    expect(frame.visible).toEqual([]);
+    expect(frame.status.kind).toBe('inactive');
+  });
+
+  it('shows a Desire Icon for every enemy inside the Sphere', () => {
+    const near = new TestEnemy(IN_RANGE);
+    const far = new TestEnemy(OUT_OF_RANGE);
+    const system = systemWith([near, far]);
+    parleyFor(system, 1);
+    const frame = system.update({
+      isParleying: true,
+      playerPosition: PLAYER_AT,
+      deltaMs: 100,
+      roomElapsedMs: EARLY_MS,
+    });
+    expect(frame.visible.map((target) => target.bargainable)).toEqual([near]);
+    expect(frame.visible[0]?.cost).toEqual({ kind: 'Gold', fractionOfGold: 0.25 });
+  });
+
+  it('charges the demand and sends the enemy away once the hold completes', () => {
+    const enemy = new TestEnemy(IN_RANGE);
+    const system = systemWith([enemy]);
+    parleyFor(system, 9);
+    expect(enemy.fled).toBe(true);
+    expect(system.resources.gold).toBe(150);
+  });
+
+  it('charges nothing until the hold completes', () => {
+    const system = systemWith([new TestEnemy(IN_RANGE)]);
+    parleyFor(system, 5);
+    expect(system.resources.gold).toBe(200);
+  });
+
+  it('quotes the late price after the Aggro Delay lapses (GDD 4.1.1)', () => {
+    const system = systemWith([new TestEnemy(IN_RANGE)]);
+    const frame = system.update({
+      isParleying: true,
+      playerPosition: PLAYER_AT,
+      deltaMs: 100,
+      roomElapsedMs: LATE_MS,
+    });
+    expect(frame.isLate).toBe(true);
+    expect(frame.visible[0]?.cost).toEqual({ kind: 'Gold', fractionOfGold: 0.375 });
+  });
+
+  it('settles a fled enemy only once, and stops offering it', () => {
+    const enemy = new TestEnemy(IN_RANGE);
+    const system = systemWith([enemy]);
+    parleyFor(system, 9);
+    const goldAfterFirst = system.resources.gold;
+    parleyFor(system, 20);
+    expect(system.resources.gold).toBe(goldAfterFirst);
+  });
+
+  it('refuses a fatal demand and leaves the enemy in place', () => {
+    const enemy = new TestEnemy(IN_RANGE, {
+      tier: 'Normal',
+      cost: { kind: 'Vitality', damage: 30 },
+    });
+    const system = systemWith([enemy], 200, 20);
+    parleyFor(system, 9);
+    expect(enemy.fled).toBe(false);
+    expect(system.resources.vitality).toBe(20);
+  });
+});

@@ -1,5 +1,13 @@
-import type { PlayerStats } from '../data/PlayerStats';
 import type { Vector2 } from '../math/Vector2';
+
+/**
+ * The slice of `PlayerStats` that movement depends on. Narrow on purpose: movement
+ * has no business knowing about gold or vitality (CLAUDE.md 3.4).
+ */
+export interface MovementStats {
+  readonly moveSpeedPixelsPerSecond: number;
+  readonly parleyMovementPenalty: number;
+}
 
 /** The slice of `InputIntent` that movement depends on (CLAUDE.md 3.4). */
 export interface MovementIntent {
@@ -15,7 +23,7 @@ const FULL_SPEED_FACTOR = 1;
  * rules are unit-testable (CLAUDE.md 3.5).
  */
 export class PlayerMovement {
-  public constructor(private readonly stats: PlayerStats) {}
+  public constructor(private readonly stats: MovementStats) {}
 
   /**
    * Returns velocity in pixels per second.

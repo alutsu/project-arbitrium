@@ -1,3 +1,4 @@
+import type { BargainData } from '../bargain/BargainData';
 import { err, ok, type Result } from '../core/Result';
 import type { PlayerStats } from './PlayerStats';
 import type { UpgradeData, UpgradeId } from './UpgradeData';
@@ -10,18 +11,23 @@ import type { WeaponData, WeaponId } from './WeaponData';
  * Lookups throw on an unknown id. That is a programmer error — a typo in a spawn
  * table, not a runtime condition to recover from (CLAUDE.md 4.4).
  */
+/** Everything the database is built from, as a named group rather than a long signature. */
+export interface GameRecords {
+  readonly weapons: readonly WeaponData[];
+  readonly upgrades: readonly UpgradeData[];
+  readonly playerStats: PlayerStats;
+  readonly bargain: BargainData;
+}
+
 export class GameDatabase {
   private constructor(
     private readonly weaponsById: ReadonlyMap<WeaponId, WeaponData>,
     private readonly upgradesById: ReadonlyMap<UpgradeId, UpgradeData>,
-    public readonly playerStats: PlayerStats,
+    private readonly records: GameRecords,
   ) {}
 
-  public static create(
-    weapons: readonly WeaponData[],
-    upgrades: readonly UpgradeData[],
-    playerStats: PlayerStats,
-  ): Result<GameDatabase> {
+  public static create(records: GameRecords): Result<GameDatabase> {
+    const { weapons, upgrades } = records;
     const weaponsById = new Map<WeaponId, WeaponData>();
     for (const weapon of weapons) {
       if (weaponsById.has(weapon.id)) {
@@ -38,7 +44,15 @@ export class GameDatabase {
       upgradesById.set(upgrade.id, upgrade);
     }
 
-    return ok(new GameDatabase(weaponsById, upgradesById, playerStats));
+    return ok(new GameDatabase(weaponsById, upgradesById, records));
+  }
+
+  public get playerStats(): PlayerStats {
+    return this.records.playerStats;
+  }
+
+  public get bargain(): BargainData {
+    return this.records.bargain;
   }
 
   public get weapons(): readonly WeaponData[] {

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { PlayerStats } from '../data/PlayerStats';
-import { PlayerMovement } from './PlayerMovement';
+import { PlayerMovement, type MovementStats } from './PlayerMovement';
 
-const STATS: PlayerStats = { moveSpeedPixelsPerSecond: 200, parleyMovementPenalty: 0.3 };
+const STATS: MovementStats = { moveSpeedPixelsPerSecond: 200, parleyMovementPenalty: 0.3 };
 const movement = new PlayerMovement(STATS);
 
 const magnitudeOf = (velocity: { x: number; y: number }): number =>
