@@ -20,6 +20,7 @@ import { ArcadePlayerActor } from '../player/ArcadePlayerActor';
 import { PlayerController } from '../player/PlayerController';
 import { PlayerMovement } from '../player/PlayerMovement';
 import { PlayerResources } from '../player/PlayerResources';
+import { PrideDebuff } from '../player/PrideDebuff';
 import { ParleyView } from '../ui/ParleyView';
 import { ResourceHud } from '../ui/ResourceHud';
 import { RoomView } from '../ui/RoomView';
@@ -163,7 +164,7 @@ export class GameScene extends Phaser.Scene {
     // Read once per frame and share it: a second read would consume the edge-detected
     // one-shot actions.
     const intent = input.readIntent();
-    controller.update(intent);
+    controller.update(intent, { speedMultiplier: parley.state.pride.speedMultiplier });
 
     const frame = parley.update({
       isParleying: intent.isParleying,
@@ -173,7 +174,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.parleyView?.render(frame, actor.position.x, actor.position.y);
-    this.hud?.render(parley.resources, room === null ? '' : roomLabel(room));
+    this.hud?.render(parley.state, room === null ? '' : roomLabel(room));
 
     if (room !== null) {
       this.followExits(room, actor.position);
@@ -215,6 +216,8 @@ export class GameScene extends Phaser.Scene {
     this.currentRoom = room;
     // The Aggro Delay is measured from entering the room (GDD 4.1.1).
     this.roomElapsedMs = NO_TIME;
+    // A Pride debuff ages by one room on entry (GDD 4.1.2).
+    this.parleySystem?.onRoomEntry();
 
     const spawn = this.spawnPointFor(room.template, travelled);
     sprite.setPosition(spawn.x, spawn.y);
@@ -281,10 +284,13 @@ export class GameScene extends Phaser.Scene {
       session: new ParleySession(settings.holdDurationMs),
       service: new BargainService(settings),
       settings,
-      resources: new PlayerResources(
-        database.playerStats.startingGold,
-        database.playerStats.maxVitality,
-      ),
+      state: {
+        resources: new PlayerResources(
+          database.playerStats.startingGold,
+          database.playerStats.maxVitality,
+        ),
+        pride: PrideDebuff.none,
+      },
     });
   }
 

@@ -2,6 +2,7 @@
   "aggroDelayMs": 1500,
   "lateCostMultiplier": 1.5,
   "holdDurationMs": 900,
+  "prideRoomsAffected": 1,
   "vitalityForUnpayableGold": 40,
   "sphereRadiusPixels": 170,
   "demands": [
@@ -24,6 +25,13 @@
       "cost": {
         "kind": "Gold",
         "fractionOfGold": 0.25
+      }
+    },
+    {
+      "tier": "Normal",
+      "cost": {
+        "kind": "Pride",
+        "speedPenalty": 0.2
       }
     }
   ]

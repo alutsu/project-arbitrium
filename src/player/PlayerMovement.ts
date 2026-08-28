@@ -1,4 +1,5 @@
 import type { Vector2 } from '../math/Vector2';
+import type { PlayerCondition } from './PlayerCondition';
 
 /**
  * The slice of `PlayerStats` that movement depends on. Narrow on purpose: movement
@@ -34,7 +35,7 @@ export class PlayerMovement {
    * lumpy movement on high-refresh displays: the physics step runs on an accumulator
    * ahead of `scene.update`, so several frames of displacement land in one step.
    */
-  public resolveVelocity(intent: MovementIntent): Vector2 {
+  public resolveVelocity(intent: MovementIntent, condition: PlayerCondition): Vector2 {
     const magnitude = Math.hypot(intent.moveAxes.x, intent.moveAxes.y);
     if (magnitude === 0) {
       return STOPPED;
@@ -42,7 +43,7 @@ export class PlayerMovement {
 
     // Dividing by the magnitude normalizes the input to unit length, so a diagonal
     // travels exactly as fast as a cardinal rather than sqrt(2) times as fast.
-    const speed = this.currentSpeed(intent.isParleying) / magnitude;
+    const speed = this.currentSpeed(intent.isParleying, condition) / magnitude;
 
     return {
       x: intent.moveAxes.x * speed,
@@ -50,12 +51,15 @@ export class PlayerMovement {
     };
   }
 
-  private currentSpeed(isParleying: boolean): number {
+  /**
+   * Penalties compound: a Pride debuff and the Parley hold both slow the player, and
+   * bargaining while already humbled is slower still (GDD 2.2.1, 4.1.2).
+   */
+  private currentSpeed(isParleying: boolean, condition: PlayerCondition): number {
+    const base = this.stats.moveSpeedPixelsPerSecond * condition.speedMultiplier;
     if (!isParleying) {
-      return this.stats.moveSpeedPixelsPerSecond;
+      return base;
     }
-    return (
-      this.stats.moveSpeedPixelsPerSecond * (FULL_SPEED_FACTOR - this.stats.parleyMovementPenalty)
-    );
+    return base * (FULL_SPEED_FACTOR - this.stats.parleyMovementPenalty);
   }
 }

@@ -46,6 +46,12 @@ function parseSettings(raw: JsonRecord): Result<BargainSettings> {
   if (!holdDurationMs.ok) return err(`bargain.json: ${holdDurationMs.error}`);
   const sphereRadiusPixels = readField.number(raw, 'sphereRadiusPixels');
   if (!sphereRadiusPixels.ok) return err(`bargain.json: ${sphereRadiusPixels.error}`);
+  const prideRoomsAffected = readField.number(raw, 'prideRoomsAffected');
+  if (!prideRoomsAffected.ok) return err(`bargain.json: ${prideRoomsAffected.error}`);
+  if (!Number.isInteger(prideRoomsAffected.value) || prideRoomsAffected.value < MIN_FRACTION) {
+    return err('bargain.json: "prideRoomsAffected" must be a whole number of at least 0');
+  }
+
   const vitalityForUnpayableGold = readField.number(raw, 'vitalityForUnpayableGold');
   if (!vitalityForUnpayableGold.ok) return err(`bargain.json: ${vitalityForUnpayableGold.error}`);
   if (vitalityForUnpayableGold.value <= MIN_DURATION_MS) {
@@ -66,6 +72,7 @@ function parseSettings(raw: JsonRecord): Result<BargainSettings> {
     aggroDelayMs: aggroDelayMs.value,
     lateCostMultiplier: lateCostMultiplier.value,
     holdDurationMs: holdDurationMs.value,
+    prideRoomsAffected: prideRoomsAffected.value,
     vitalityForUnpayableGold: vitalityForUnpayableGold.value,
     sphereRadiusPixels: sphereRadiusPixels.value,
   });
@@ -101,6 +108,15 @@ function parseCost(raw: JsonRecord, at: (message: string) => string): Result<Bar
       return err(at('"fractionOfGold" must be above 0 and at most 1'));
     }
     return ok({ kind: 'Gold', fractionOfGold: fractionOfGold.value });
+  }
+
+  if (kind.value === 'Pride') {
+    const speedPenalty = readField.number(raw, 'speedPenalty');
+    if (!speedPenalty.ok) return err(at(speedPenalty.error));
+    if (speedPenalty.value <= MIN_FRACTION || speedPenalty.value >= MAX_FRACTION) {
+      return err(at('"speedPenalty" must be above 0 and below 1, or the player cannot move'));
+    }
+    return ok({ kind: 'Pride', speedPenalty: speedPenalty.value });
   }
 
   const damage = readField.number(raw, 'damage');

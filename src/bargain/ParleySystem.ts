@@ -1,4 +1,5 @@
-import { PlayerResources } from '../player/PlayerResources';
+import type { PlayerResources } from '../player/PlayerResources';
+import type { PlayerState } from '../player/PlayerState';
 import type { Vector2 } from '../math/Vector2';
 import type { Bargainable } from './Bargainable';
 import type { BargainCost } from './BargainCost';
@@ -11,7 +12,7 @@ export interface ParleySystemDeps {
   readonly session: ParleySession;
   readonly service: BargainService;
   readonly settings: BargainSettings;
-  readonly resources: PlayerResources;
+  readonly state: PlayerState;
 }
 
 export interface ParleyInputFrame {
@@ -42,10 +43,10 @@ export interface ParleyFrame {
  */
 export class ParleySystem {
   private readonly bargainables: Bargainable[] = [];
-  private currentResources: PlayerResources;
+  private currentState: PlayerState;
 
   public constructor(private readonly deps: ParleySystemDeps) {
-    this.currentResources = deps.resources;
+    this.currentState = deps.state;
   }
 
   public add(bargainable: Bargainable): void {
@@ -57,8 +58,20 @@ export class ParleySystem {
     this.bargainables.length = 0;
   }
 
+  public get state(): PlayerState {
+    return this.currentState;
+  }
+
   public get resources(): PlayerResources {
-    return this.currentResources;
+    return this.currentState.resources;
+  }
+
+  /** Ages a Pride debuff by one room, expiring it once it has outlived its rooms. */
+  public onRoomEntry(): void {
+    this.currentState = {
+      ...this.currentState,
+      pride: this.currentState.pride.afterRoomEntry(),
+    };
   }
 
   public update(input: ParleyInputFrame): ParleyFrame {
@@ -82,7 +95,7 @@ export class ParleySystem {
       bargainable,
       cost: this.deps.service.costFor(bargainable.demand, {
         roomElapsedMs: input.roomElapsedMs,
-        resources: this.currentResources,
+        resources: this.currentState.resources,
       }),
     }));
 
@@ -101,9 +114,9 @@ export class ParleySystem {
   private settle(target: Bargainable, input: ParleyInputFrame): void {
     const cost = this.deps.service.costFor(target.demand, {
       roomElapsedMs: input.roomElapsedMs,
-      resources: this.currentResources,
+      resources: this.currentState.resources,
     });
-    this.currentResources = this.deps.service.settle(cost, this.currentResources);
+    this.currentState = this.deps.service.settle(cost, this.currentState);
 
     const index = this.bargainables.indexOf(target);
     if (index >= 0) {

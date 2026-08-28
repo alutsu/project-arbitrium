@@ -1,6 +1,7 @@
 import type { InputIntent } from '../input/InputIntent';
 import type { Vector2 } from '../math/Vector2';
 import type { PlayerActor } from './PlayerActor';
+import type { PlayerCondition } from './PlayerCondition';
 import type { PlayerMovement } from './PlayerMovement';
 
 /**
@@ -14,8 +15,8 @@ export class PlayerController {
     private readonly actor: PlayerActor,
   ) {}
 
-  public update(intent: InputIntent): void {
-    this.actor.setVelocity(this.movement.resolveVelocity(intent));
+  public update(intent: InputIntent, condition: PlayerCondition): void {
+    this.actor.setVelocity(this.movement.resolveVelocity(intent, condition));
 
     const position = this.actor.position;
     // Aiming exactly at your own feet has no direction; keep the current facing

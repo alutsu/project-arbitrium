@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PlayerResources } from '../player/PlayerResources';
+import type { PlayerState } from '../player/PlayerState';
+import { PrideDebuff } from '../player/PrideDebuff';
 import { BargainService } from './BargainService';
 import type { BargainDemand } from './BargainDemand';
 import type { BargainSettings } from './BargainSettings';
@@ -8,6 +10,7 @@ const SETTINGS: BargainSettings = {
   aggroDelayMs: 1500,
   lateCostMultiplier: 1.5,
   holdDurationMs: 900,
+  prideRoomsAffected: 1,
   vitalityForUnpayableGold: 40,
   sphereRadiusPixels: 170,
 };
@@ -21,6 +24,11 @@ const DURING_AGGRO_DELAY = 1000;
 const AFTER_AGGRO_DELAY = 2000;
 const SOLVENT = new PlayerResources(200, 50);
 const BROKE = new PlayerResources(0, 50);
+
+const stateOf = (resources: PlayerResources): PlayerState => ({
+  resources,
+  pride: PrideDebuff.none,
+});
 
 const priceFor = (demand: BargainDemand, roomElapsedMs: number, resources = SOLVENT) =>
   service.costFor(demand, { roomElapsedMs, resources });
@@ -83,17 +91,50 @@ describe('BargainService', () => {
   });
 
   it('settles a gold demand against the player purse', () => {
-    expect(service.settle({ kind: 'Gold', fractionOfGold: 0.25 }, SOLVENT).gold).toBe(150);
+    const after = service.settle({ kind: 'Gold', fractionOfGold: 0.25 }, stateOf(SOLVENT));
+    expect(after.resources.gold).toBe(150);
   });
 
   it('settles a vitality demand', () => {
-    expect(service.settle({ kind: 'Vitality', damage: 10 }, BROKE).vitality).toBe(40);
+    const after = service.settle({ kind: 'Vitality', damage: 10 }, stateOf(BROKE));
+    expect(after.resources.vitality).toBe(40);
   });
 
   it('lets a Parley kill a player who can no longer pay (GDD 2.2.2)', () => {
-    const dying = new PlayerResources(0, 6);
-    const after = service.settle({ kind: 'Vitality', damage: 8 }, dying);
-    expect(after.vitality).toBe(0);
-    expect(after.isDefeated).toBe(true);
+    const after = service.settle(
+      { kind: 'Vitality', damage: 8 },
+      stateOf(new PlayerResources(0, 6)),
+    );
+    expect(after.resources.vitality).toBe(0);
+    expect(after.resources.isDefeated).toBe(true);
+  });
+
+  it('settles a Pride demand as a debuff, charging no resources (GDD 4.1.2)', () => {
+    const after = service.settle({ kind: 'Pride', speedPenalty: 0.25 }, stateOf(SOLVENT));
+    expect(after.resources.gold).toBe(200);
+    expect(after.resources.vitality).toBe(50);
+    expect(after.pride.isActive).toBe(true);
+    expect(after.pride.speedMultiplier).toBeCloseTo(0.75);
+    expect(after.pride.roomsRemaining).toBe(SETTINGS.prideRoomsAffected);
+  });
+
+  it('surcharges a late Pride demand', () => {
+    const pride: BargainDemand = { tier: 'Normal', cost: { kind: 'Pride', speedPenalty: 0.2 } };
+    expect(priceFor(pride, AFTER_AGGRO_DELAY)).toEqual({
+      kind: 'Pride',
+      speedPenalty: 0.30000000000000004,
+    });
+  });
+
+  it('never lets a late Pride demand immobilise the player', () => {
+    const cruel: BargainDemand = { tier: 'Unique', cost: { kind: 'Pride', speedPenalty: 0.8 } };
+    const cost = priceFor(cruel, AFTER_AGGRO_DELAY);
+    if (cost.kind !== 'Pride') throw new Error('expected a Pride cost');
+    expect(cost.speedPenalty).toBeCloseTo(0.9);
+  });
+
+  it('does not convert a Pride demand when the purse is empty', () => {
+    const pride: BargainDemand = { tier: 'Normal', cost: { kind: 'Pride', speedPenalty: 0.2 } };
+    expect(priceFor(pride, DURING_AGGRO_DELAY, BROKE).kind).toBe('Pride');
   });
 });

@@ -303,7 +303,9 @@ The "Parley Phase" occurs at the start of the encounter.
 
 Mercy is therefore only cheap while the player is solvent. Bargain the gold away and the price starts coming out of flesh; keep bargaining and it kills. This is where the Death Spiral in 2.2.2 actually ends.
 
-Pride is not yet implemented. A debuff scoped to "the next room" needs the dungeon topology from Sprint 4 to know when it expires; charging it before then would apply a penalty the game could never lift.
+**Pride** costs nothing at the moment it is paid and slows the player instead. The debuff is measured in room entries, not seconds: paying it in one room also slows the *next* one, then expires. That is the "next room is harder" risk, and it means a Pride demand is cheap only if the player is confident about what comes next.
+
+Penalties compound. A Pride debuff multiplies the base speed, and holding Parley takes its 30% off whatever remains, so bargaining while already humbled is the slowest the player ever moves. A late Pride demand is surcharged like any other, but is capped so it can never immobilise the player outright.
 
 #### 4.1.3 Parley Constants
 
@@ -313,6 +315,8 @@ Pride is not yet implemented. A debuff scoped to "the next room" needs the dunge
 | Late Cost Multiplier | 1.5 | The +50% surcharge from 4.1.1, applied once the Aggro Delay lapses. |
 | Hold Duration | 900 ms | Long enough that holding is a real commitment, short enough to be worth it under pressure. First-pass value. |
 | Vitality for Unpayable Gold | 40 | Vitality charged for a demand of the *entire* purse when the player cannot pay; a smaller demand costs proportionally less. Against 100 Max Vitality, roughly two and a half full-purse demands are fatal. First-pass value. |
+| Pride Rooms Affected | 1 | Further room entries a Pride debuff survives, so the room after the bargain is slowed too. |
+| Max Speed Penalty | 90% | Ceiling on a surcharged Pride demand, so a late bargain can never leave the player unable to move. |
 | Sphere of Influence Radius | 170 px | Reaches a nearby enemy without covering the arena, so positioning still matters. First-pass value. |
 
 ### 4.2 The Weapon Generation Algorithm

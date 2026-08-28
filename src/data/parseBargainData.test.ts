@@ -5,6 +5,7 @@ const VALID = {
   aggroDelayMs: 1500,
   lateCostMultiplier: 1.5,
   holdDurationMs: 900,
+  prideRoomsAffected: 1,
   vitalityForUnpayableGold: 40,
   sphereRadiusPixels: 170,
   demands: [

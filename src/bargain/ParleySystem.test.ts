@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PlayerResources } from '../player/PlayerResources';
+import { PrideDebuff } from '../player/PrideDebuff';
 import type { Bargainable } from './Bargainable';
 import type { BargainDemand } from './BargainDemand';
 import { BargainService } from './BargainService';
@@ -11,6 +12,7 @@ const SETTINGS: BargainSettings = {
   aggroDelayMs: 1500,
   lateCostMultiplier: 1.5,
   holdDurationMs: 900,
+  prideRoomsAffected: 1,
   vitalityForUnpayableGold: 40,
   sphereRadiusPixels: 170,
 };
@@ -38,7 +40,7 @@ const systemWith = (enemies: TestEnemy[], gold = 200, vitality = 50): ParleySyst
     session: new ParleySession(SETTINGS.holdDurationMs),
     service: new BargainService(SETTINGS),
     settings: SETTINGS,
-    resources: new PlayerResources(gold, vitality),
+    state: { resources: new PlayerResources(gold, vitality), pride: PrideDebuff.none },
   });
   for (const enemy of enemies) system.add(enemy);
   return system;
@@ -116,6 +118,24 @@ describe('ParleySystem', () => {
     const goldAfterFirst = system.resources.gold;
     parleyFor(system, 20);
     expect(system.resources.gold).toBe(goldAfterFirst);
+  });
+
+  it('takes a Pride demand as a debuff that outlives the room (GDD 4.1.2)', () => {
+    const enemy = new TestEnemy(IN_RANGE, {
+      tier: 'Normal',
+      cost: { kind: 'Pride', speedPenalty: 0.2 },
+    });
+    const system = systemWith([enemy]);
+    parleyFor(system, 9);
+
+    expect(enemy.fled).toBe(true);
+    expect(system.resources.gold).toBe(200);
+    expect(system.state.pride.speedMultiplier).toBeCloseTo(0.8);
+
+    system.onRoomEntry();
+    expect(system.state.pride.isActive).toBe(true);
+    system.onRoomEntry();
+    expect(system.state.pride.isActive).toBe(false);
   });
 
   it('lets a Parley kill, which is how the Death Spiral ends (GDD 2.2.2)', () => {
