@@ -1,4 +1,4 @@
-import type { PlayerStats } from '../config/playerStats';
+import type { PlayerStats } from '../data/PlayerStats';
 import type { Vector2 } from '../math/Vector2';
 
 /** The slice of `InputIntent` that movement depends on (CLAUDE.md 3.4). */

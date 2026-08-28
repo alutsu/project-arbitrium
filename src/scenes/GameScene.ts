@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_DISPLAY } from '../config/gameDisplay';
-import { PLAYER_STATS } from '../config/playerStats';
+import { DATA_KEYS } from '../data/dataKeys';
+import { loadGameData } from '../data/loadGameData';
+import { PhaserJsonSource } from '../data/PhaserJsonSource';
 import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { ArcadePlayerActor } from '../player/ArcadePlayerActor';
 import { PlayerController } from '../player/PlayerController';
@@ -29,7 +31,20 @@ export class GameScene extends Phaser.Scene {
     super({ key: GameScene.KEY });
   }
 
+  public preload(): void {
+    this.load.json(DATA_KEYS.weapons, 'data/weapons.json');
+    this.load.json(DATA_KEYS.upgrades, 'data/upgrades.json');
+    this.load.json(DATA_KEYS.playerStats, 'data/player.json');
+  }
+
   public create(): void {
+    // Invalid data is a programmer error, so fail loudly here rather than let an
+    // undefined surface deep in a system later (CLAUDE.md 4.4).
+    const gameData = loadGameData(new PhaserJsonSource(this.cache.json));
+    if (!gameData.ok) {
+      throw new Error(`Game data failed validation: ${gameData.error}`);
+    }
+
     this.createPlayerTexture();
 
     const keyboard = this.input.keyboard;
@@ -47,7 +62,7 @@ export class GameScene extends Phaser.Scene {
     const input = new KeyboardMouseInput(this.input, keyboard);
     this.playerController = new PlayerController(
       input,
-      new PlayerMovement(PLAYER_STATS),
+      new PlayerMovement(gameData.value.playerStats),
       new ArcadePlayerActor(sprite),
     );
 

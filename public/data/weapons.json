@@ -1,0 +1,52 @@
+[
+  {
+    "id": "rusty_pistol",
+    "name": "Rusty Pistol",
+    "type": "Ranged",
+    "tags": ["Ranged", "Projectile", "Light"],
+    "spriteKey": "weapon_rusty_pistol",
+    "damage": 6,
+    "attackRate": 4,
+    "knockbackForce": 40,
+    "projectileSpriteKey": "projectile_bullet",
+    "projectileSpeed": 520,
+    "projectileCount": 1
+  },
+  {
+    "id": "scrap_scattergun",
+    "name": "Scrap Scattergun",
+    "type": "Ranged",
+    "tags": ["Ranged", "Projectile", "Heavy"],
+    "spriteKey": "weapon_scrap_scattergun",
+    "damage": 4,
+    "attackRate": 1.2,
+    "knockbackForce": 160,
+    "projectileSpriteKey": "projectile_pellet",
+    "projectileSpeed": 420,
+    "projectileCount": 5
+  },
+  {
+    "id": "chipped_sabre",
+    "name": "Chipped Sabre",
+    "type": "Melee",
+    "tags": ["Melee", "Blade", "Light"],
+    "spriteKey": "weapon_chipped_sabre",
+    "damage": 11,
+    "attackRate": 2.2,
+    "knockbackForce": 90,
+    "swingArc": 100,
+    "lungeAmount": 28
+  },
+  {
+    "id": "pitted_maul",
+    "name": "Pitted Maul",
+    "type": "Melee",
+    "tags": ["Melee", "Blunt", "Heavy"],
+    "spriteKey": "weapon_pitted_maul",
+    "damage": 24,
+    "attackRate": 0.8,
+    "knockbackForce": 260,
+    "swingArc": 70,
+    "lungeAmount": 12
+  }
+]

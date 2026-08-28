@@ -140,36 +140,47 @@ Given the requirement for "Total Randomness," procedural generation, and the com
 
 #### 3.1.1 Weapon Data Structure
 
-We will define a `WeaponData` interface. The actual weapon variations will be stored in a `weapons.json` file and loaded into Phaser's Cache via `this.load.json()`. We include a string array of `tags` to handle the Forge logic.typescript
-export type WeaponType = 'Ranged' | 'Melee';
-export type WeaponTag = 'Projectile' | 'Hitscan' | 'Beam' | 'Heavy' | 'Light' | 'Blade' | 'Blunt';
+We will define a `WeaponData` type. The variations are stored in a `weapons.json` file and loaded into Phaser's Cache via `this.load.json()`, then **validated on load** before any system sees them — a cache read is untrusted input, not a typed object. The `tags` array drives Forge compatibility.
 
-export interface WeaponData {
-id: string;
-name: string;
-type: WeaponType;
-tags: WeaponTag[]; // Used for Forge compatibility
-spriteKey: string;
+```typescript
+export type WeaponTag =
+  | 'Ranged' | 'Melee'
+  | 'Projectile' | 'Hitscan' | 'Beam'
+  | 'Heavy' | 'Light'
+  | 'Blade' | 'Blunt';
 
-```
-damage: number;
-attackRate: number; 
-knockbackForce: number;
+/** Branded so a weapon id cannot be passed where an upgrade id is expected. */
+export type WeaponId = string & { readonly __brand: 'WeaponId' };
 
-// Ranged Specific
-projectileSpriteKey?: string;
-projectileSpeed?: number;
-projectileCount?: number; // Modified by "Split Chamber"
-
-// Melee Specific
-swingArc?: number; 
-lungeAmount?: number; 
-
-```
-
+interface WeaponBase {
+  readonly id: WeaponId;
+  readonly name: string;
+  readonly tags: readonly WeaponTag[];   // Used for Forge compatibility
+  readonly spriteKey: string;
+  readonly damage: number;
+  readonly attackRate: number;           // Attacks per second
+  readonly knockbackForce: number;
 }
 
+export type WeaponData =
+  | (WeaponBase & {
+      readonly type: 'Ranged';
+      readonly projectileSpriteKey: string;
+      readonly projectileSpeed: number;
+      readonly projectileCount: number;  // Modified by "Split Chamber"
+    })
+  | (WeaponBase & {
+      readonly type: 'Melee';
+      readonly swingArc: number;
+      readonly lungeAmount: number;
+    });
+
+export type WeaponType = WeaponData['type'];
 ```
+
+A discriminated union rather than one interface with optional fields, so a Melee weapon cannot carry `projectileSpeed` and a Ranged one cannot carry `swingArc`.
+
+`Ranged` and `Melee` are both a `WeaponType` and a `WeaponTag`. The Module table in 2.4.2 constrains on `[Melee]` and `[Ranged]`, and `requiredTags` is an AND-list, so "Blade or Blunt" cannot express "any melee weapon". Every weapon therefore carries the tag matching its own type, and the loader rejects a weapon whose tags disagree with its type.
 
 #### 3.1.2 Upgrade Data Structure (The Forge)
 Upgrades are defined in an `upgrades.json` file. The game registry uses these to filter valid upgrades for the current weapon.
@@ -192,6 +203,16 @@ export interface UpgradeData {
 }
 
 ```
+
+#### 3.1.3 Data Files
+
+| File | Cache key | Contents |
+| --- | --- | --- |
+| `public/data/weapons.json` | `weapons` | `WeaponData[]` |
+| `public/data/upgrades.json` | `upgrades` | `UpgradeData[]` |
+| `public/data/player.json` | `playerStats` | Movement values from 3.3.1 |
+
+Each is parsed by a validator returning `Result<T, string>`. A failure names the file, the index and the offending field; the scene throws on it rather than starting with half-valid data.
 
 ### 3.2 The Procedural Director (Level Generation)
 
@@ -343,23 +364,36 @@ The Forge is the primary "Gold Sink."
 
 ### 9.1 JSON Data Registry
 
+`GameDatabase` holds the validated records and is the single place systems look data up. It is built from already-parsed records rather than from a Scene, so it carries no Phaser dependency and is testable on its own; a thin `PhaserJsonSource` adapter is what reads the cache.
+
 ```typescript
 export class GameDatabase {
-    private upgrades: UpgradeData[] = [];
-    
-    constructor(scene: Phaser.Scene) {
-        // Load parsed JSON data from the Phaser cache
-        this.upgrades = scene.cache.json.get('upgradesData');
-    }
-    
-    public getCompatibleUpgrades(weapon: WeaponData): UpgradeData[] {
-        return this.upgrades.filter(u => 
-            u.requiredTags.every(t => weapon.tags.includes(t)) && 
-            !u.forbiddenTags.some(t => weapon.tags.includes(t))
-        );
-    }
-}
+    public static create(
+        weapons: readonly WeaponData[],
+        upgrades: readonly UpgradeData[],
+        playerStats: PlayerStats,
+    ): Result<GameDatabase>          // rejects duplicate ids
 
+    public readonly playerStats: PlayerStats;
+    public get weapons(): readonly WeaponData[];
+    public get upgrades(): readonly UpgradeData[];
+
+    public weapon(id: WeaponId): WeaponData;      // throws, naming an unknown id
+    public upgrade(id: UpgradeId): UpgradeData;   // throws, naming an unknown id
+}
+```
+
+Lookups throw rather than return `undefined`: an unknown id is a typo in a spawn table, a programmer error, not a runtime condition to recover from.
+
+Compatibility filtering belongs to the Forge and arrives with it in Sprint 7:
+
+```typescript
+getCompatibleUpgrades(weapon: WeaponData): UpgradeData[] {
+    return this.upgrades.filter(u =>
+        u.requiredTags.every(t => weapon.tags.includes(t)) &&
+        !u.forbiddenTags.some(t => weapon.tags.includes(t))
+    );
+}
 ```
 
 ### 9.2 The "Component" Approach in Phaser

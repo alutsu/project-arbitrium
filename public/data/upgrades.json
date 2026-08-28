@@ -1,0 +1,52 @@
+[
+  {
+    "id": "split_chamber",
+    "name": "Split Chamber",
+    "goldCost": 45,
+    "iconKey": "module_split_chamber",
+    "requiredTags": ["Projectile"],
+    "forbiddenTags": ["Melee"],
+    "extraProjectiles": 1
+  },
+  {
+    "id": "volatile_casing",
+    "name": "Volatile Casing",
+    "goldCost": 70,
+    "iconKey": "module_volatile_casing",
+    "requiredTags": ["Projectile"],
+    "forbiddenTags": ["Hitscan", "Melee"],
+    "enableExplosions": true
+  },
+  {
+    "id": "quantum_mag",
+    "name": "Quantum Mag",
+    "goldCost": 55,
+    "iconKey": "module_quantum_mag",
+    "requiredTags": ["Projectile"],
+    "forbiddenTags": ["Melee"]
+  },
+  {
+    "id": "phase_blade",
+    "name": "Phase Blade",
+    "goldCost": 65,
+    "iconKey": "module_phase_blade",
+    "requiredTags": ["Melee"],
+    "forbiddenTags": ["Ranged"]
+  },
+  {
+    "id": "serrated_edge",
+    "name": "Serrated Edge",
+    "goldCost": 50,
+    "iconKey": "module_serrated_edge",
+    "requiredTags": ["Melee"],
+    "forbiddenTags": ["Ranged"]
+  },
+  {
+    "id": "titan_grip",
+    "name": "Titan Grip",
+    "goldCost": 40,
+    "iconKey": "module_titan_grip",
+    "requiredTags": ["Heavy"],
+    "forbiddenTags": ["Light"]
+  }
+]

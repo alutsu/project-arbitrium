@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PlayerStats } from '../config/playerStats';
-import { PLAYER_STATS } from '../config/playerStats';
+import type { PlayerStats } from '../data/PlayerStats';
 import { PlayerMovement } from './PlayerMovement';
 
 const STATS: PlayerStats = { moveSpeedPixelsPerSecond: 200, parleyMovementPenalty: 0.3 };
@@ -69,9 +68,5 @@ describe('PlayerMovement', () => {
     });
     const velocity = halfSpeed.resolveVelocity({ moveAxes: { x: 1, y: 0 }, isParleying: true });
     expect(velocity.x).toBeCloseTo(100);
-  });
-
-  it('keeps the shipped parley penalty at the value the GDD specifies', () => {
-    expect(PLAYER_STATS.parleyMovementPenalty).toBe(0.3);
   });
 });
