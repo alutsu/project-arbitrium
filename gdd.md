@@ -539,9 +539,14 @@ happened to be watching a number in the HUD.
 
 | Event | What the player sees |
 | --- | --- |
-| A hit lands | A spark burst at the point of impact, the damage as a rising number, and the target flashing white for 90ms |
+| A hit lands | A spark burst at the point of impact, the damage as a rising number, the target flashing white for 90ms, and a light camera kick |
 | Something dies | A larger burst, and the Gold it paid as a rising number |
 | The player is hit | A camera kick scaled to the damage, and a red flash over the screen |
+
+Landing a hit and taking one both kick the camera, but not equally: landing is 45-80ms at
+roughly 2-4 pixels, taking is 90-220ms at 2-9 pixels. Taking a hit also **forces** the
+shake, so it always overrides a lighter kick already running; landing one does not, so a
+shotgun's five pellets in a single frame produce one kick rather than five.
 
 Two things worth knowing before tuning any of it:
 

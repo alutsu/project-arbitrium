@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import { GAME_DISPLAY } from '../config/gameDisplay';
 import type { Vector2 } from '../math/Vector2';
-import { shakeForDamage } from './feedbackStrength';
+import { shakeForDamage, shakeForLandedHit } from './feedbackStrength';
 
 const SPARK_COUNT_HIT = 6;
 const SPARK_COUNT_KILL = 18;
@@ -24,6 +24,7 @@ const VIGNETTE_LIFESPAN_MS = 260;
 
 const MILLISECONDS_PER_SECOND = 1000;
 const SPENT = 0;
+const FORCE_SHAKE = true;
 
 interface Rising {
   readonly text: Phaser.GameObjects.Text;
@@ -62,10 +63,15 @@ export class FeedbackView {
     this.vignette = scene.add.graphics().setDepth(depth).setScrollFactor(0);
   }
 
-  /** A hit landed on something: sparks and the damage dealt. */
+  /** A hit landed on something: sparks, the damage dealt, and a light kick. */
   public hit(at: Vector2, damage: number): void {
     this.sparks.explode(SPARK_COUNT_HIT, at.x, at.y);
     this.float(at, `-${String(Math.round(damage))}`, DAMAGE_STYLE);
+
+    const shake = shakeForLandedHit(damage);
+    // Not forced: a shotgun lands five pellets in one frame, and a kick already running
+    // for a hit the player *took* matters more than one for a hit they landed.
+    this.scene.cameras.main.shake(shake.durationMs, shake.intensity);
   }
 
   /** Something died: a bigger burst, and the Gold it paid out. */
@@ -77,7 +83,8 @@ export class FeedbackView {
   /** The player was hit: kick the camera and flash the screen. */
   public playerHurt(damage: number): void {
     const shake = shakeForDamage(damage);
-    this.scene.cameras.main.shake(shake.durationMs, shake.intensity);
+    // Forced, so being hurt always overrides a lighter kick from landing a hit.
+    this.scene.cameras.main.shake(shake.durationMs, shake.intensity, FORCE_SHAKE);
     this.vignetteRemainingMs = VIGNETTE_LIFESPAN_MS;
   }
 

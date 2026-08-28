@@ -1,31 +1,62 @@
-/**
- * Phaser reads intensity as a fraction of the viewport, so 0.016 threw the world about
- * twenty pixels and shoved the room over the HUD. These give roughly 2 to 9 pixels.
- */
-const MIN_INTENSITY = 0.002;
-const MAX_INTENSITY = 0.007;
-const MIN_DURATION_MS = 90;
-const MAX_DURATION_MS = 220;
 /** The damage at which a shake is already as violent as it will get. */
 const SATURATING_DAMAGE = 20;
 const NONE = 0;
+const FULL = 1;
 
 export interface Shake {
   readonly durationMs: number;
   readonly intensity: number;
 }
 
+interface ShakeRange {
+  readonly minDurationMs: number;
+  readonly maxDurationMs: number;
+  /**
+   * Phaser reads intensity as a fraction of the viewport, not a pixel count: 0.016 of a
+   * 1280-wide canvas throws the world about twenty pixels and shoves the room over the
+   * HUD. These ranges are deliberately small.
+   */
+  readonly minIntensity: number;
+  readonly maxIntensity: number;
+}
+
+/** Taking a hit. The heavier kick of the two, because it is a threat. */
+const TAKEN: ShakeRange = {
+  minDurationMs: 90,
+  maxDurationMs: 220,
+  minIntensity: 0.002,
+  maxIntensity: 0.007,
+};
+
 /**
- * How hard the camera should kick for a hit of this size.
- *
- * Scaled rather than fixed so a Grunt's 7 and the Floor Warden's 14 do not feel alike,
- * and clamped at both ends so a scratch still registers and a big hit never becomes
- * unreadable. Pure, so the tuning is stated in one place and tested.
+ * Landing a hit. Shorter and lighter than taking one: it should punctuate the hit
+ * without competing with the feedback that the player is in danger.
  */
+const LANDED: ShakeRange = {
+  minDurationMs: 45,
+  maxDurationMs: 80,
+  minIntensity: 0.0012,
+  maxIntensity: 0.003,
+};
+
+/** How hard the camera should kick when the player is hit for this much. */
 export function shakeForDamage(damage: number): Shake {
-  const fraction = Math.min(1, Math.max(NONE, damage / SATURATING_DAMAGE));
+  return shakeIn(TAKEN, damage);
+}
+
+/** How hard the camera should kick when the player lands a hit for this much. */
+export function shakeForLandedHit(damage: number): Shake {
+  return shakeIn(LANDED, damage);
+}
+
+/**
+ * Scaled by damage and clamped at both ends, so a scratch still registers and a big hit
+ * never becomes unreadable.
+ */
+function shakeIn(range: ShakeRange, damage: number): Shake {
+  const fraction = Math.min(FULL, Math.max(NONE, damage / SATURATING_DAMAGE));
   return {
-    durationMs: MIN_DURATION_MS + (MAX_DURATION_MS - MIN_DURATION_MS) * fraction,
-    intensity: MIN_INTENSITY + (MAX_INTENSITY - MIN_INTENSITY) * fraction,
+    durationMs: range.minDurationMs + (range.maxDurationMs - range.minDurationMs) * fraction,
+    intensity: range.minIntensity + (range.maxIntensity - range.minIntensity) * fraction,
   };
 }

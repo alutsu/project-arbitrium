@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shakeForDamage } from './feedbackStrength';
+import { shakeForDamage, shakeForLandedHit } from './feedbackStrength';
 
 describe('shakeForDamage', () => {
   it('kicks harder for a bigger hit', () => {
@@ -30,6 +30,36 @@ describe('shakeForDamage', () => {
       const shake = shakeForDamage(damage);
       expect(shake.intensity).toBeLessThanOrEqual(0.007);
       expect(shake.durationMs).toBeLessThanOrEqual(220);
+    }
+  });
+});
+
+describe('shakeForLandedHit', () => {
+  it('kicks harder for a bigger hit, like taking one does', () => {
+    expect(shakeForLandedHit(14).intensity).toBeGreaterThan(shakeForLandedHit(3).intensity);
+  });
+
+  it('is gentler and shorter than taking the same hit', () => {
+    for (const damage of [1, 7, 14, 20]) {
+      const landed = shakeForLandedHit(damage);
+      const taken = shakeForDamage(damage);
+      expect(landed.intensity).toBeLessThan(taken.intensity);
+      expect(landed.durationMs).toBeLessThan(taken.durationMs);
+    }
+  });
+
+  it('still registers the smallest hit', () => {
+    expect(shakeForLandedHit(1).intensity).toBeGreaterThan(0);
+  });
+
+  it('stops growing once the hit is already devastating', () => {
+    expect(shakeForLandedHit(20)).toEqual(shakeForLandedHit(200));
+  });
+
+  it('stays small enough that rapid fire does not make the screen unreadable', () => {
+    for (const damage of [0, 1, 7, 14, 20, 90]) {
+      expect(shakeForLandedHit(damage).intensity).toBeLessThanOrEqual(0.003);
+      expect(shakeForLandedHit(damage).durationMs).toBeLessThanOrEqual(80);
     }
   });
 });
