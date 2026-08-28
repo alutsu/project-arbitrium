@@ -1,5 +1,5 @@
 import type { InputIntent } from '../input/InputIntent';
-import type { Vector2 } from '../math/Vector2';
+import { angleBetween } from '../math/angleBetween';
 import type { PlayerActor } from './PlayerActor';
 import type { PlayerCondition } from './PlayerCondition';
 import type { PlayerMovement } from './PlayerMovement';
@@ -26,8 +26,4 @@ export class PlayerController {
     }
     this.actor.setFacing(angleBetween(position, intent.aimPoint));
   }
-}
-
-function angleBetween(from: Vector2, to: Vector2): number {
-  return Math.atan2(to.y - from.y, to.x - from.x);
 }

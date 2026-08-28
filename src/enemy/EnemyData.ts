@@ -18,6 +18,10 @@ export interface EnemyData {
   readonly spriteKey: string;
   /** Relative likelihood of being drawn when a room suits this enemy. */
   readonly weight: number;
+  /** How much damage this enemy absorbs before dying. */
+  readonly vitality: number;
+  /** Gold dropped on death. Bargaining pays none of it (GDD 2.2.2, 8.3). */
+  readonly goldReward: number;
   readonly roomTags: readonly RoomTag[];
   readonly prefers: readonly TileKind[];
 }

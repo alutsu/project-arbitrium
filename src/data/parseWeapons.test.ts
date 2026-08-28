@@ -14,6 +14,8 @@ const RANGED = {
   projectileSpriteKey: 'projectile_bullet',
   projectileSpeed: 520,
   projectileCount: 1,
+  spreadDegrees: 3,
+  rangePixels: 500,
 };
 
 const MELEE = {
@@ -28,6 +30,7 @@ const MELEE = {
   goldValue: 30,
   swingArc: 100,
   lungeAmount: 28,
+  reachPixels: 62,
 };
 
 /** Builds a copy without one field, to prove the parser requires it. */
@@ -62,6 +65,14 @@ describe('parseWeapons', () => {
 
   it('rejects anything that is not an array', () => {
     expect(errorOf({ weapons: [] })).toContain('array');
+  });
+
+  it('rejects a ranged weapon with no range', () => {
+    expect(errorOf([{ ...RANGED, rangePixels: 0 }])).toContain('range');
+  });
+
+  it('rejects a melee weapon that reaches nothing', () => {
+    expect(errorOf([{ ...MELEE, reachPixels: 0 }])).toContain('reachPixels');
   });
 
   it('rejects a ranged weapon missing its projectile fields', () => {

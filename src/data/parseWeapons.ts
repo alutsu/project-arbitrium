@@ -5,6 +5,7 @@ import { WEAPON_TAGS } from './WeaponTag';
 import { WEAPON_TYPES, type WeaponData, type WeaponId } from './WeaponData';
 
 const MIN_GOLD_VALUE = 0;
+const MIN_PROJECTILES = 1;
 
 /**
  * Validates the contents of `weapons.json` (GDD 3.1.1). Never trust a cache read to
@@ -81,7 +82,7 @@ function parseWeapon(entry: unknown, index: number): Result<WeaponData> {
 
 type WeaponBaseFields = Omit<
   Extract<WeaponData, { type: 'Melee' }>,
-  'type' | 'swingArc' | 'lungeAmount'
+  'type' | 'swingArc' | 'lungeAmount' | 'reachPixels'
 >;
 type Contextualize = (message: string) => string;
 
@@ -96,6 +97,13 @@ function parseRanged(
   if (!projectileSpeed.ok) return err(at(projectileSpeed.error));
   const projectileCount = readField.number(entry, 'projectileCount');
   if (!projectileCount.ok) return err(at(projectileCount.error));
+  const spreadDegrees = readField.number(entry, 'spreadDegrees');
+  if (!spreadDegrees.ok) return err(at(spreadDegrees.error));
+  const rangePixels = readField.number(entry, 'rangePixels');
+  if (!rangePixels.ok) return err(at(rangePixels.error));
+  if (projectileCount.value < MIN_PROJECTILES || rangePixels.value <= MIN_GOLD_VALUE) {
+    return err(at('a ranged weapon needs at least one projectile and a range above zero'));
+  }
 
   return ok({
     ...base,
@@ -103,6 +111,8 @@ function parseRanged(
     projectileSpriteKey: projectileSpriteKey.value,
     projectileSpeed: projectileSpeed.value,
     projectileCount: projectileCount.value,
+    spreadDegrees: spreadDegrees.value,
+    rangePixels: rangePixels.value,
   });
 }
 
@@ -115,6 +125,17 @@ function parseMelee(
   if (!swingArc.ok) return err(at(swingArc.error));
   const lungeAmount = readField.number(entry, 'lungeAmount');
   if (!lungeAmount.ok) return err(at(lungeAmount.error));
+  const reachPixels = readField.number(entry, 'reachPixels');
+  if (!reachPixels.ok) return err(at(reachPixels.error));
+  if (reachPixels.value <= MIN_GOLD_VALUE) {
+    return err(at('"reachPixels" must be greater than zero, or the swing hits nothing'));
+  }
 
-  return ok({ ...base, type: 'Melee', swingArc: swingArc.value, lungeAmount: lungeAmount.value });
+  return ok({
+    ...base,
+    type: 'Melee',
+    swingArc: swingArc.value,
+    lungeAmount: lungeAmount.value,
+    reachPixels: reachPixels.value,
+  });
 }

@@ -15,6 +15,8 @@ const weapon = (id: string): WeaponData => ({
   projectileSpriteKey: 'projectile_bullet',
   projectileSpeed: 500,
   projectileCount: 1,
+  spreadDegrees: 3,
+  rangePixels: 500,
 });
 
 describe('WeaponSlot', () => {

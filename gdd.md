@@ -28,7 +28,9 @@ The target demographic consists of "Hardcore Adaptors"—players who enjoy the f
 
 ### 2.1 The Gameplay Cycle
 
-> **Implementation note.** Doors seal on entry and unlock when the room is cleared, and "cleared" means nothing bargainable remains. Combat is not implemented — weapons do not fire, and the roadmap in 7 never assigns the work — so today the only way to clear a room is to bargain with every enemy in it. That makes the Death Spiral in 2.2.2 the *only* path through a floor rather than one of two, and it is the single largest gap between this document and the build.
+> **Implementation note.** Doors seal on entry and unlock when the room is cleared. A room clears when nothing in it is left to bargain with, whether it was killed or paid off, and either way the Weapon Pedestal then rises.
+>
+> Both halves of the choice now exist: weapons fire, enemies have Vitality, and a kill pays Gold that a Parley never does. What is still missing is enemies fighting *back* — they have no behaviour tree yet (5.2), so they stand still and absorb damage. Until that lands, the risk half of "fight or bargain" is priced at zero.
 
 The fundamental atomic unit of *Project Arbitrium* is the "Room." The loop within a single room is a microcosm of the entire game's economy.
 
@@ -105,6 +107,8 @@ Weapons are still whole entries from `weapons.json`. The part-based assembly in 
 
 Weapons are procedurally generated using a "Part" system. To increase variety, we include both Ranged and Melee archetypes.
 
+The parts below are the intended generator; weapons currently ship as whole entries in `weapons.json` (see 2.3.1). The stats each part is said to govern are real fields on `WeaponData`: the Barrel's spread and range are `spreadDegrees` and `rangePixels`, and the Handle's reach is `reachPixels`.
+
 **Ranged Parts:**
 
 * **Core:** Projectile behavior (Bullet, Beam, Rocket).
@@ -156,9 +160,9 @@ Honed Edge is the universal Module 2.4.1 calls for. The other universal it menti
 | Honed Edge | `damageMultiplier` | yes |
 | Split Chamber | `extraProjectiles` | yes |
 | Titan Grip | `knockbackMultiplier` | yes |
-| Volatile Casing | explosion on impact | no — needs projectiles |
+| Volatile Casing | explosion on impact | no — projectiles now exist, but area damage does not |
 | Quantum Mag | chance not to consume ammo | no — needs an ammo system |
-| Phase Blade | swing passes through walls | no — behavioural, needs combat |
+| Phase Blade | swing passes through walls | no — melee now exists; this is the first Module needing a per-id strategy |
 | Serrated Edge | Bleed damage over time | no — needs a damage-over-time system |
 
 ---
@@ -380,7 +384,9 @@ To ensure "Total Randomness" feels fair:
 
 ### 5.1 Enemy Roster
 
-* **Normal:** Grunt (Melee), Turret (Stationary Ranged).
+Every enemy carries `vitality`, which is how much damage it absorbs, and `goldReward`, which it drops when killed. Bargaining pays none of it (2.2.2).
+
+* **Normal:** Grunt (Melee), Turret (Stationary Ranged). Grunt 18 Vitality for 9 Gold; Turret 30 for 14. First-pass values.
 * **Rare:** Blink-Stalker (Teleport), Alchemist (AOE Potion).
 
 ### 5.2 AI Behavior Trees
@@ -417,6 +423,8 @@ A custom Behavior Tree utility class or an external state machine library will h
 
 ### Phase 3: Content Expansion (Months 7-9)
 
+> **Inserted:** a combat sprint between Sprints 7 and 8. Firing, projectiles, melee arcs, enemy Vitality, death and Gold rewards were never assigned to a sprint, yet Sprint 8's Bosses and the Alchemist's AOE both depend on them, as do four Modules in 2.4.2. Sprint 8 now follows it.
+
 * **Sprint 7:** The Forge UI (Phaser DOM Elements or UI Plugins) & Compatibility System.
 * **Sprint 8:** Unique Enemies & Bosses.
 * **Sprint 9:** Visuals & Juice (Phaser Particle Emitters, Camera Shake).
@@ -446,7 +454,7 @@ Implemented, rounded up so a price is always whole coins. `CurrentFloor` comes f
 
 ### 8.3 The "No Reward" Bargain Math
 
-* **Fight:** High risk, Gold/XP reward.
+* **Fight:** High risk, Gold/XP reward. Gold is implemented as `goldReward` per enemy; there is no XP system.
 * **Bargain:** Survival while solvent. Gold cost, or Vitality once the purse is empty — at which point a Parley can kill.
 * **Dynamic:** Bargaining drains the resource (Gold) needed for the Forge, eventually forcing the player to fight to regain purchasing power.
 
@@ -493,7 +501,7 @@ getCompatibleUpgrades(weapon: WeaponData): UpgradeData[] {
 While Phaser uses a classical inheritance model for GameObjects, we will use a composition pattern for weapons:
 
 * `WeaponController` (Handles the state and input).
-* `WeaponVisuals` (Handles the Phaser `Sprite` and animations).
+* `WeaponVisuals` (Handles the Phaser `Sprite` and animations). **Not built:** the weapon is not drawn in the player's hands, so there is no sprite to own. `WeaponController` and the stats on `WeaponData` are implemented.
 * `WeaponStats` (Applies modifiers from the loaded JSON and Forge upgrades).
 
 ---

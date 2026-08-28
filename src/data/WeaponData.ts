@@ -26,11 +26,17 @@ export type WeaponData =
       readonly projectileSpriteKey: string;
       readonly projectileSpeed: number;
       readonly projectileCount: number;
+      /** Total spread of a multi-projectile shot, in degrees (GDD 2.3.2, Barrel). */
+      readonly spreadDegrees: number;
+      /** How far a projectile travels before expiring (GDD 2.3.2, Barrel). */
+      readonly rangePixels: number;
     })
   | (WeaponBase & {
       readonly type: 'Melee';
       readonly swingArc: number;
       readonly lungeAmount: number;
+      /** How far the swing reaches from the player (GDD 2.3.2, Handle). */
+      readonly reachPixels: number;
     });
 
 export type WeaponType = WeaponData['type'];

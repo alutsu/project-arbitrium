@@ -63,6 +63,19 @@ export class ParleySystem {
     return this.bargainables.length;
   }
 
+  /**
+   * Forgets one bargainable, for an enemy that died rather than being paid off.
+   *
+   * The roster living here is a seam worth revisiting: it is really the room's enemy
+   * list, and combat now needs to touch it too.
+   */
+  public remove(bargainable: Bargainable): void {
+    const index = this.bargainables.indexOf(bargainable);
+    if (index >= 0) {
+      this.bargainables.splice(index, 1);
+    }
+  }
+
   /** Forgets every bargainable, for when the player leaves the room they were in. */
   public clear(): void {
     this.bargainables.length = 0;

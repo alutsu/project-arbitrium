@@ -21,6 +21,8 @@ const ranged: WeaponData = {
   projectileSpriteKey: 'projectile_bullet',
   projectileSpeed: 500,
   projectileCount: 1,
+  spreadDegrees: 3,
+  rangePixels: 500,
 };
 
 const heavyMelee: WeaponData = {
@@ -35,6 +37,7 @@ const heavyMelee: WeaponData = {
   goldValue: 45,
   swingArc: 70,
   lungeAmount: 12,
+  reachPixels: 62,
 };
 
 const upgrade = (

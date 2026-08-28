@@ -46,6 +46,17 @@ function parseEnemy(entry: unknown, index: number): Result<EnemyData> {
   if (weight.value <= MIN_WEIGHT) {
     return err(at('"weight" must be greater than zero, or the enemy can never spawn'));
   }
+  const vitality = readField.number(entry, 'vitality');
+  if (!vitality.ok) return err(at(vitality.error));
+  if (vitality.value <= MIN_WEIGHT) {
+    return err(at('"vitality" must be greater than zero, or the enemy dies on spawn'));
+  }
+  const goldReward = readField.number(entry, 'goldReward');
+  if (!goldReward.ok) return err(at(goldReward.error));
+  if (goldReward.value < MIN_WEIGHT) {
+    return err(at('"goldReward" must not be negative'));
+  }
+
   const roomTags = readField.arrayOf(entry, 'roomTags', ROOM_TAGS);
   if (!roomTags.ok) return err(at(roomTags.error));
   if (roomTags.value.length === EMPTY) {
@@ -64,6 +75,8 @@ function parseEnemy(entry: unknown, index: number): Result<EnemyData> {
     tier: tier.value,
     spriteKey: spriteKey.value,
     weight: weight.value,
+    vitality: vitality.value,
+    goldReward: goldReward.value,
     roomTags: roomTags.value,
     prefers: prefers.value,
   });

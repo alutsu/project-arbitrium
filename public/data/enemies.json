@@ -6,7 +6,9 @@
     "spriteKey": "enemy_grunt",
     "weight": 6,
     "roomTags": ["Arena", "Corridor"],
-    "prefers": ["Open", "Cover"]
+    "prefers": ["Open", "Cover"],
+    "vitality": 18,
+    "goldReward": 9
   },
   {
     "id": "turret",
@@ -15,6 +17,8 @@
     "spriteKey": "enemy_turret",
     "weight": 3,
     "roomTags": ["Arena"],
-    "prefers": ["Corner"]
+    "prefers": ["Corner"],
+    "vitality": 30,
+    "goldReward": 14
   }
 ]

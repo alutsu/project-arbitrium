@@ -16,6 +16,7 @@ const weapon = (id: string, goldValue: number): WeaponData => ({
   goldValue,
   swingArc: 90,
   lungeAmount: 20,
+  reachPixels: 62,
 });
 
 const HELD = weapon('rusty', 20);

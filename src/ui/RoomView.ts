@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
 import type { RoomTemplate } from '../dungeon/RoomTemplate';
+import { TERRAIN_GID } from '../dungeon/TerrainGid';
 
 /** Tiled numbers its tiles from 1; a Phaser data tilemap indexes them from 0. */
-const FIRST_GID = 1;
-const FLOOR_INDEX = 0;
-const WALL_INDEX = 1;
+const FIRST_GID = TERRAIN_GID.floor;
+const WALL_INDEX = TERRAIN_GID.wall - FIRST_GID;
 const TILESET_NAME = 'placeholder';
 
 /**
@@ -56,10 +56,6 @@ export class RoomView {
     created.setCollision(WALL_INDEX);
     this.layer = created;
     return created;
-  }
-
-  public get floorIndex(): number {
-    return FLOOR_INDEX;
   }
 
   public destroy(): void {

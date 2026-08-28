@@ -1,8 +1,8 @@
+import { TERRAIN_GID } from './TerrainGid';
 import { coordinateKey, type GridCoordinate } from './GridCoordinate';
 import type { RoomTemplate } from './RoomTemplate';
 import type { TileKind } from './TileKind';
 
-const FLOOR_GID = 1;
 const COVER_WALLS = 1;
 
 /** Where every walkable tile in a room sits, grouped so spawning can query by kind. */
@@ -67,7 +67,7 @@ function isFloor(template: RoomTemplate, tile: GridCoordinate): boolean {
   ) {
     return false;
   }
-  return template.tiles[tile.y * template.widthInTiles + tile.x] === FLOOR_GID;
+  return template.tiles[tile.y * template.widthInTiles + tile.x] === TERRAIN_GID.floor;
 }
 
 function classify(template: RoomTemplate, tile: GridCoordinate): TileKind {

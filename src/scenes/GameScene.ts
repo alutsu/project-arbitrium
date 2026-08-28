@@ -15,10 +15,19 @@ import { coordinateKey, type GridCoordinate } from '../dungeon/GridCoordinate';
 import { isAtExit } from '../dungeon/isAtExit';
 import { FloorProgress } from '../dungeon/FloorProgress';
 import { sealedRoomOf } from '../dungeon/sealedRoomOf';
+import { TERRAIN_GID } from '../dungeon/TerrainGid';
 import { resolveLiquidation, type LiquidationChoice } from '../liquidation/LiquidationService';
 import type { WeaponData } from '../data/WeaponData';
 import { WeaponSlot } from '../weapon/WeaponSlot';
 import { PedestalView } from '../ui/PedestalView';
+import { AttackCooldown } from '../combat/AttackCooldown';
+import type { Damageable } from '../combat/Damageable';
+import { isWithinSwing } from '../combat/isWithinSwing';
+import { ProjectilePool } from '../combat/ProjectilePool';
+import { WeaponController, type Attack } from '../combat/WeaponController';
+import { angleBetween } from '../math/angleBetween';
+import { SwingView } from '../ui/SwingView';
+import { DefeatView } from '../ui/DefeatView';
 import { ForgeService, type ForgeOffer } from '../forge/ForgeService';
 import { FORGE_ROOM_TAG } from '../dungeon/RoomTemplate';
 import { ForgeView } from '../ui/ForgeView';
@@ -70,6 +79,11 @@ const ENEMY_PLACEHOLDER_COLORS: readonly number[] = [
 const HASH_SEED = 7;
 const HASH_MULTIPLIER = 31;
 
+const PROJECTILE_TEXTURE_KEY = 'projectile-placeholder';
+const PROJECTILE_SIZE = 8;
+const PROJECTILE_RADIUS = PROJECTILE_SIZE * CENTER_FACTOR;
+const PROJECTILE_COLOR = 0xffe9a8;
+
 const TILESET_TEXTURE_KEY = 'terrain-placeholder';
 const TILE_SIZE = 40;
 const FLOOR_COLOR = 0x16161d;
@@ -113,7 +127,14 @@ export class GameScene extends Phaser.Scene {
   private dungeon: Dungeon | null = null;
   private currentRoom: DungeonRoom | null = null;
   private wallCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private enemySprites: Phaser.GameObjects.Sprite[] = [];
+  private currentSealed: RoomTemplate | null = null;
+  private enemySprites: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody[] = [];
+  private enemies: Enemy[] = [];
+  private projectiles: ProjectilePool | null = null;
+  private weaponController: WeaponController | null = null;
+  private swingView: SwingView | null = null;
+  private defeatView: DefeatView | null = null;
+  private enemyCollider: Phaser.Physics.Arcade.Collider | null = null;
   private readonly analyzer = new RoomAnalyzer();
   private director: EncounterDirector | null = null;
   private floorSeed = NO_TIME;
@@ -195,6 +216,10 @@ export class GameScene extends Phaser.Scene {
     this.forgeService = new ForgeService(database.upgrades);
     this.pedestalView = new PedestalView(this, DEPTH_PEDESTAL);
     this.forgeView = new ForgeView(this, DEPTH_PARLEY);
+    this.projectiles = new ProjectilePool(this, PROJECTILE_TEXTURE_KEY, DEPTH_ENTITIES);
+    this.weaponController = new WeaponController(new AttackCooldown());
+    this.swingView = new SwingView(this, DEPTH_PARLEY);
+    this.defeatView = new DefeatView(this, DEPTH_HUD);
     this.hud = new ResourceHud(this, DEPTH_HUD);
 
     this.enterRoom(this.dungeon.start, null);
@@ -219,7 +244,13 @@ export class GameScene extends Phaser.Scene {
     // Read once per frame and share it: a second read would consume the edge-detected
     // one-shot actions.
     const intent = input.readIntent();
+    if (parley.state.resources.isDefeated) {
+      this.defeatView?.show();
+      actor.setVelocity({ x: 0, y: 0 });
+      return;
+    }
     controller.update(intent, { speedMultiplier: parley.state.pride.speedMultiplier });
+    this.runCombat(intent, actor.position, delta);
 
     const frame = parley.update({
       isParleying: intent.isParleying,
@@ -228,6 +259,7 @@ export class GameScene extends Phaser.Scene {
       roomElapsedMs: this.roomElapsedMs,
     });
 
+    this.swingView?.render(delta);
     this.parleyView?.render(frame, actor.position.x, actor.position.y);
     this.hud?.render(
       parley.state,
@@ -250,6 +282,98 @@ export class GameScene extends Phaser.Scene {
     if (this.progress.isCleared(room.coordinate)) {
       this.followExits(room, actor.position);
     }
+  }
+
+  /** Fires the held weapon, moves projectiles, and settles what they hit. */
+  private runCombat(intent: InputIntent, origin: GridCoordinate, deltaMs: number): void {
+    const weapons = this.weaponController;
+    const slot = this.weaponSlot;
+    const pool = this.projectiles;
+    if (weapons === null || slot === null || pool === null) {
+      return;
+    }
+    const aimRadians = angleBetween(origin, intent.aimPoint);
+    const attack = weapons.attempt(slot.weapon, {
+      origin,
+      aimRadians,
+      isAttacking: intent.isAttacking,
+      deltaMs,
+    });
+    this.realise(attack, origin, pool);
+
+    const struck = pool.update(deltaMs, {
+      isSolidAt: (x, y) => this.isSolidAt(x, y),
+      targets: this.enemies,
+    });
+    this.collectSpoils(struck);
+  }
+
+  private realise(attack: Attack, origin: GridCoordinate, pool: ProjectilePool): void {
+    if (attack.kind === 'ranged') {
+      for (const angle of attack.angles) {
+        pool.fire({
+          x: origin.x,
+          y: origin.y,
+          angle,
+          speed: attack.speed,
+          rangePixels: attack.rangePixels,
+          damage: attack.damage,
+          knockback: attack.knockback,
+        });
+      }
+      return;
+    }
+    if (attack.kind === 'none') {
+      return;
+    }
+    this.swingView?.flash(attack.swing);
+    const hit = this.enemies.filter(
+      (enemy) => enemy.isAlive && isWithinSwing(attack.swing, enemy.position),
+    );
+    for (const enemy of hit) {
+      enemy.takeHit(attack.damage, attack.knockback, origin);
+    }
+    this.collectSpoils(hit);
+  }
+
+  /** A killed enemy pays gold; a bargained one never does (GDD 2.2.2, 8.3). */
+  private collectSpoils(struck: readonly Damageable[]): void {
+    const parley = this.parleySystem;
+    if (parley === null) {
+      return;
+    }
+    for (const target of struck) {
+      const enemy = this.enemies.find((candidate) => candidate === target);
+      if (enemy === undefined || enemy.isAlive) {
+        continue;
+      }
+      parley.replaceResources(parley.resources.gainGold(enemy.data.goldReward));
+      parley.remove(enemy);
+      this.enemies = this.enemies.filter((candidate) => candidate !== enemy);
+    }
+  }
+
+  /**
+   * Solidity comes from the sealed room's own tile data, not from the Tilemap.
+   * `getTileAtWorldXY` is typed as returning a Tile but returns null out of bounds, and
+   * reading the data we already validated keeps one source of truth for where walls are.
+   */
+  private isSolidAt(x: number, y: number): boolean {
+    const template = this.currentSealed;
+    if (template === null) {
+      return true;
+    }
+    const tileX = Math.floor(x / template.tileWidth);
+    const tileY = Math.floor(y / template.tileHeight);
+    if (
+      tileX < NONE ||
+      tileY < NONE ||
+      tileX >= template.widthInTiles ||
+      tileY >= template.heightInTiles
+    ) {
+      return true;
+    }
+    return template.tiles[tileY * template.widthInTiles + tileX] !== TERRAIN_GID.floor;
   }
 
   /** A room is cleared once nothing in it is left to bargain with (GDD 2.1 phase 4). */
@@ -407,6 +531,7 @@ export class GameScene extends Phaser.Scene {
     layer.setDepth(DEPTH_TERRAIN);
     this.wallCollider?.destroy();
     this.wallCollider = this.physics.add.collider(sprite, layer);
+    this.currentSealed = sealed;
     this.currentRoom = room;
     // The Aggro Delay is measured from entering the room (GDD 4.1.1).
     this.roomElapsedMs = NO_TIME;
@@ -428,6 +553,9 @@ export class GameScene extends Phaser.Scene {
       this.offered = null;
       this.repopulateRoom(room, sealed);
     }
+    this.enemyCollider?.destroy();
+    this.enemyCollider =
+      this.enemySprites.length > NONE ? this.physics.add.collider(this.enemySprites, layer) : null;
   }
 
   /** Centre of the room on arrival at the entrance, otherwise clear of the door used. */
@@ -475,14 +603,16 @@ export class GameScene extends Phaser.Scene {
 
     for (const spawn of plan) {
       const textureKey = this.enemyTextureFor(spawn.enemy.spriteKey);
-      const sprite = this.add.sprite(
+      const sprite = this.physics.add.sprite(
         (spawn.tile.x + TILE_CENTRE) * sealed.tileWidth,
         (spawn.tile.y + TILE_CENTRE) * sealed.tileHeight,
         textureKey,
       );
       sprite.setDepth(DEPTH_ENTITIES);
       this.enemySprites.push(sprite);
-      this.parleySystem?.add(new Enemy(sprite, spawn.enemy, spawn.demand));
+      const enemy = new Enemy(sprite, spawn.enemy, spawn.demand);
+      this.enemies.push(enemy);
+      this.parleySystem?.add(enemy);
     }
   }
 
@@ -491,6 +621,8 @@ export class GameScene extends Phaser.Scene {
       sprite.destroy();
     }
     this.enemySprites = [];
+    this.enemies = [];
+    this.projectiles?.clear();
     this.parleySystem?.clear();
   }
 
@@ -560,6 +692,12 @@ export class GameScene extends Phaser.Scene {
     graphics.generateTexture(PLAYER_TEXTURE_KEY, PLAYER_TEXTURE_SIZE, PLAYER_TEXTURE_SIZE);
 
     graphics.clear();
+    graphics
+      .fillStyle(PROJECTILE_COLOR)
+      .fillCircle(PROJECTILE_RADIUS, PROJECTILE_RADIUS, PROJECTILE_RADIUS);
+    graphics.generateTexture(PROJECTILE_TEXTURE_KEY, PROJECTILE_SIZE, PROJECTILE_SIZE);
+
+    graphics.clear();
     graphics.fillStyle(FLOOR_COLOR).fillRect(0, 0, TILE_SIZE, TILE_SIZE);
     graphics.fillStyle(WALL_COLOR).fillRect(TILE_SIZE, 0, TILE_SIZE, TILE_SIZE);
     graphics.generateTexture(TILESET_TEXTURE_KEY, TILE_SIZE * TILESET_TILE_COUNT, TILE_SIZE);
@@ -571,6 +709,10 @@ export class GameScene extends Phaser.Scene {
     this.parleyView?.destroy();
     this.pedestalView?.destroy();
     this.forgeView?.destroy();
+    this.projectiles?.destroy();
+    this.swingView?.destroy();
+    this.defeatView?.destroy();
+    this.enemyCollider?.destroy();
     this.roomView?.destroy();
     this.hud?.destroy();
     this.wallCollider?.destroy();
@@ -587,6 +729,13 @@ export class GameScene extends Phaser.Scene {
     this.pedestalView = null;
     this.forgeView = null;
     this.forgeService = null;
+    this.projectiles = null;
+    this.weaponController = null;
+    this.swingView = null;
+    this.defeatView = null;
+    this.enemyCollider = null;
+    this.currentSealed = null;
+    this.enemies = [];
     this.database = null;
     this.weaponSlot = null;
     this.offered = null;

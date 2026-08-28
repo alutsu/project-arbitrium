@@ -7,6 +7,8 @@ const GRUNT = {
   tier: 'Normal',
   spriteKey: 'enemy_grunt',
   weight: 6,
+  vitality: 18,
+  goldReward: 9,
   roomTags: ['Arena', 'Corridor'],
   prefers: ['Open', 'Cover'],
 };
@@ -34,6 +36,11 @@ describe('parseEnemies', () => {
     expect(errorOf([{ ...GRUNT, weight: 0 }])).toContain('weight');
     expect(errorOf([{ ...GRUNT, roomTags: [] }])).toContain('roomTags');
     expect(errorOf([{ ...GRUNT, prefers: [] }])).toContain('prefers');
+  });
+
+  it('rejects an enemy that dies on spawn or pays a negative reward', () => {
+    expect(errorOf([{ ...GRUNT, vitality: 0 }])).toContain('vitality');
+    expect(errorOf([{ ...GRUNT, goldReward: -1 }])).toContain('goldReward');
   });
 
   it('rejects unknown tiers, room tags and tile kinds', () => {

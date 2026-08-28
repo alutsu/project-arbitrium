@@ -45,6 +45,8 @@ const enemy = (shape: EnemyShape): EnemyData => ({
   tier: 'Normal',
   spriteKey: `enemy_${shape.id}`,
   weight: DEFAULT_WEIGHT,
+  vitality: 18,
+  goldReward: 9,
   roomTags: shape.roomTags,
   prefers: shape.prefers,
 });

@@ -26,6 +26,7 @@ const weapon = (id: string): WeaponData => ({
   goldValue: 30,
   swingArc: 90,
   lungeAmount: 20,
+  reachPixels: 62,
 });
 
 const upgrade = (id: string): UpgradeData => ({

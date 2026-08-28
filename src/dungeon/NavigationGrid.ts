@@ -1,7 +1,6 @@
+import { TERRAIN_GID } from './TerrainGid';
 import type { GridCoordinate } from './GridCoordinate';
 import type { RoomTemplate } from './RoomTemplate';
-
-const FLOOR_GID = 1;
 
 /**
  * The walkability grid baked from a room's terrain (GDD 6.1, step 2). Pathfinding works
@@ -18,7 +17,7 @@ export class NavigationGrid {
     return new NavigationGrid(
       template.widthInTiles,
       template.heightInTiles,
-      tiles.map((gid) => gid === FLOOR_GID),
+      tiles.map((gid) => gid === TERRAIN_GID.floor),
     );
   }
 

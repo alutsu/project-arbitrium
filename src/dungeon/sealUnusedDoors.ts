@@ -1,8 +1,8 @@
+import { TERRAIN_GID } from './TerrainGid';
 import type { Direction } from './Direction';
 import type { GridCoordinate } from './GridCoordinate';
 import type { RoomExit, RoomTemplate } from './RoomTemplate';
 
-const WALL_GID = 2;
 /** Matches the doorway width used by `isAtExit`. */
 const DOOR_HALF_SPAN = 1;
 const DOOR_SPAN = DOOR_HALF_SPAN + DOOR_HALF_SPAN + 1;
@@ -21,7 +21,7 @@ export function sealUnusedDoors(
 
   for (const exit of unused) {
     for (const tile of doorwayTilesOf(template, exit)) {
-      tiles[tile] = WALL_GID;
+      tiles[tile] = TERRAIN_GID.wall;
     }
   }
   return tiles;
