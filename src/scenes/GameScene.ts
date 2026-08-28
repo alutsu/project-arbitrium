@@ -28,6 +28,11 @@ import { WeaponController, type Attack } from '../combat/WeaponController';
 import { angleBetween } from '../math/angleBetween';
 import { SwingView } from '../ui/SwingView';
 import { DefeatView } from '../ui/DefeatView';
+import { NavigationGrid } from '../dungeon/NavigationGrid';
+import type { EnemyAction } from '../enemy/EnemyBrain';
+import type { Enemy as EnemyEntity } from '../enemy/Enemy';
+import { PlayerTarget } from '../player/PlayerTarget';
+import type { ParleyFrame } from '../bargain/ParleySystem';
 import { ForgeService, type ForgeOffer } from '../forge/ForgeService';
 import { FORGE_ROOM_TAG } from '../dungeon/RoomTemplate';
 import { ForgeView } from '../ui/ForgeView';
@@ -78,6 +83,9 @@ const ENEMY_PLACEHOLDER_COLORS: readonly number[] = [
 ];
 const HASH_SEED = 7;
 const HASH_MULTIPLIER = 31;
+
+const ENEMY_PROJECTILE_TEXTURE_KEY = 'enemy-projectile-placeholder';
+const ENEMY_PROJECTILE_COLOR = 0xff8f6b;
 
 const PROJECTILE_TEXTURE_KEY = 'projectile-placeholder';
 const PROJECTILE_SIZE = 8;
@@ -131,6 +139,10 @@ export class GameScene extends Phaser.Scene {
   private enemySprites: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody[] = [];
   private enemies: Enemy[] = [];
   private projectiles: ProjectilePool | null = null;
+  private enemyProjectiles: ProjectilePool | null = null;
+  private playerTarget: PlayerTarget | null = null;
+  private navigation: NavigationGrid | null = null;
+  private aggroDelayMs = NO_TIME;
   private weaponController: WeaponController | null = null;
   private swingView: SwingView | null = null;
   private defeatView: DefeatView | null = null;
@@ -217,6 +229,15 @@ export class GameScene extends Phaser.Scene {
     this.pedestalView = new PedestalView(this, DEPTH_PEDESTAL);
     this.forgeView = new ForgeView(this, DEPTH_PARLEY);
     this.projectiles = new ProjectilePool(this, PROJECTILE_TEXTURE_KEY, DEPTH_ENTITIES);
+    this.enemyProjectiles = new ProjectilePool(this, ENEMY_PROJECTILE_TEXTURE_KEY, DEPTH_ENTITIES);
+    this.aggroDelayMs = database.bargain.settings.aggroDelayMs;
+    this.playerTarget = new PlayerTarget({
+      position: () => this.playerActor?.position ?? { x: 0, y: 0 },
+      isAlive: () => this.parleySystem?.resources.isDefeated !== true,
+      hurt: (damage) => {
+        this.hurtPlayer(damage);
+      },
+    });
     this.weaponController = new WeaponController(new AttackCooldown());
     this.swingView = new SwingView(this, DEPTH_PARLEY);
     this.defeatView = new DefeatView(this, DEPTH_HUD);
@@ -259,6 +280,7 @@ export class GameScene extends Phaser.Scene {
       roomElapsedMs: this.roomElapsedMs,
     });
 
+    this.driveEnemies(frame, actor.position, delta);
     this.swingView?.render(delta);
     this.parleyView?.render(frame, actor.position.x, actor.position.y);
     this.hud?.render(
@@ -282,6 +304,76 @@ export class GameScene extends Phaser.Scene {
     if (this.progress.isCleared(room.coordinate)) {
       this.followExits(room, actor.position);
     }
+  }
+
+  /**
+   * Lets every enemy act (GDD 5.2) and moves their shots. Enemies inside the Sphere are
+   * marked as negotiating, so holding Parley genuinely stays their hand rather than only
+   * changing the price.
+   */
+  private driveEnemies(frame: ParleyFrame, playerAt: GridCoordinate, deltaMs: number): void {
+    const grid = this.navigation;
+    const template = this.currentSealed;
+    const pool = this.enemyProjectiles;
+    const target = this.playerTarget;
+    if (grid === null || template === null || pool === null || target === null) {
+      return;
+    }
+    const negotiating = new Set(frame.visible.map((entry) => entry.bargainable));
+
+    for (const enemy of this.enemies) {
+      if (!enemy.isAlive) {
+        continue;
+      }
+      const action = enemy.brain.decide({
+        selfPosition: enemy.position,
+        playerPosition: playerAt,
+        isNegotiating: negotiating.has(enemy),
+        roomElapsedMs: this.roomElapsedMs,
+        deltaMs,
+        grid,
+        tilePixels: template.tileWidth,
+      });
+      this.actOut(enemy, action, pool);
+    }
+
+    pool.update(deltaMs, {
+      isSolidAt: (x, y) => this.isSolidAt(x, y),
+      targets: [target],
+    });
+  }
+
+  private actOut(enemy: EnemyEntity, action: EnemyAction, pool: ProjectilePool): void {
+    if (action.kind === 'advance') {
+      enemy.moveWith(action.velocity);
+      return;
+    }
+    if (action.kind === 'strike') {
+      enemy.halt();
+      this.hurtPlayer(action.damage);
+      return;
+    }
+    if (action.kind === 'shoot') {
+      pool.fire({
+        x: enemy.position.x,
+        y: enemy.position.y,
+        angle: action.angle,
+        speed: action.speed,
+        rangePixels: action.rangePixels,
+        damage: action.damage,
+        knockback: NONE,
+      });
+      return;
+    }
+    enemy.halt();
+  }
+
+  private hurtPlayer(damage: number): void {
+    const parley = this.parleySystem;
+    if (parley === null) {
+      return;
+    }
+    parley.replaceResources(parley.resources.loseVitality(damage));
   }
 
   /** Fires the held weapon, moves projectiles, and settles what they hit. */
@@ -532,6 +624,7 @@ export class GameScene extends Phaser.Scene {
     this.wallCollider?.destroy();
     this.wallCollider = this.physics.add.collider(sprite, layer);
     this.currentSealed = sealed;
+    this.navigation = NavigationGrid.fromTiles(sealed, sealed.tiles);
     this.currentRoom = room;
     // The Aggro Delay is measured from entering the room (GDD 4.1.1).
     this.roomElapsedMs = NO_TIME;
@@ -610,7 +703,12 @@ export class GameScene extends Phaser.Scene {
       );
       sprite.setDepth(DEPTH_ENTITIES);
       this.enemySprites.push(sprite);
-      const enemy = new Enemy(sprite, spawn.enemy, spawn.demand);
+      const enemy = new Enemy({
+        sprite,
+        data: spawn.enemy,
+        demand: spawn.demand,
+        aggroDelayMs: this.aggroDelayMs,
+      });
       this.enemies.push(enemy);
       this.parleySystem?.add(enemy);
     }
@@ -623,6 +721,7 @@ export class GameScene extends Phaser.Scene {
     this.enemySprites = [];
     this.enemies = [];
     this.projectiles?.clear();
+    this.enemyProjectiles?.clear();
     this.parleySystem?.clear();
   }
 
@@ -693,6 +792,12 @@ export class GameScene extends Phaser.Scene {
 
     graphics.clear();
     graphics
+      .fillStyle(ENEMY_PROJECTILE_COLOR)
+      .fillCircle(PROJECTILE_RADIUS, PROJECTILE_RADIUS, PROJECTILE_RADIUS);
+    graphics.generateTexture(ENEMY_PROJECTILE_TEXTURE_KEY, PROJECTILE_SIZE, PROJECTILE_SIZE);
+
+    graphics.clear();
+    graphics
       .fillStyle(PROJECTILE_COLOR)
       .fillCircle(PROJECTILE_RADIUS, PROJECTILE_RADIUS, PROJECTILE_RADIUS);
     graphics.generateTexture(PROJECTILE_TEXTURE_KEY, PROJECTILE_SIZE, PROJECTILE_SIZE);
@@ -710,6 +815,7 @@ export class GameScene extends Phaser.Scene {
     this.pedestalView?.destroy();
     this.forgeView?.destroy();
     this.projectiles?.destroy();
+    this.enemyProjectiles?.destroy();
     this.swingView?.destroy();
     this.defeatView?.destroy();
     this.enemyCollider?.destroy();
@@ -730,6 +836,9 @@ export class GameScene extends Phaser.Scene {
     this.forgeView = null;
     this.forgeService = null;
     this.projectiles = null;
+    this.enemyProjectiles = null;
+    this.playerTarget = null;
+    this.navigation = null;
     this.weaponController = null;
     this.swingView = null;
     this.defeatView = null;

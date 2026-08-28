@@ -3,7 +3,8 @@ import { err, ok, type Result } from '../core/Result';
 import { ROOM_TAGS } from '../dungeon/RoomTemplate';
 import { TILE_KINDS } from '../dungeon/TileKind';
 import type { EnemyData, EnemyId } from '../enemy/EnemyData';
-import { isJsonRecord } from './JsonRecord';
+import { ENEMY_BEHAVIOUR_KINDS, type EnemyBehaviourData } from '../enemy/EnemyBehaviourData';
+import { isJsonRecord, type JsonRecord } from './JsonRecord';
 import { readField } from './readField';
 
 const MIN_WEIGHT = 0;
@@ -68,6 +69,13 @@ function parseEnemy(entry: unknown, index: number): Result<EnemyData> {
     return err(at('"prefers" must list at least one tile kind this enemy stands on'));
   }
 
+  const behaviourRaw = entry['behaviour'];
+  if (!isJsonRecord(behaviourRaw)) {
+    return err(at('"behaviour" must be an object'));
+  }
+  const behaviour = parseBehaviour(behaviourRaw, at);
+  if (!behaviour.ok) return behaviour;
+
   return ok({
     // Safe to brand: the value was just proven to be a non-empty string.
     id: id.value as EnemyId,
@@ -79,5 +87,53 @@ function parseEnemy(entry: unknown, index: number): Result<EnemyData> {
     goldReward: goldReward.value,
     roomTags: roomTags.value,
     prefers: prefers.value,
+    behaviour: behaviour.value,
+  });
+}
+
+type Contextualize = (message: string) => string;
+
+function parseBehaviour(raw: JsonRecord, at: Contextualize): Result<EnemyBehaviourData> {
+  const kind = readField.oneOf(raw, 'kind', ENEMY_BEHAVIOUR_KINDS);
+  if (!kind.ok) return err(at(kind.error));
+
+  const damage = readField.number(raw, 'damage');
+  if (!damage.ok) return err(at(damage.error));
+  const attackRate = readField.number(raw, 'attackRate');
+  if (!attackRate.ok) return err(at(attackRate.error));
+  if (damage.value <= MIN_WEIGHT || attackRate.value <= MIN_WEIGHT) {
+    return err(at('"damage" and "attackRate" must both be greater than zero'));
+  }
+
+  if (kind.value === 'Melee') {
+    const moveSpeed = readField.number(raw, 'moveSpeedPixelsPerSecond');
+    if (!moveSpeed.ok) return err(at(moveSpeed.error));
+    const reachPixels = readField.number(raw, 'reachPixels');
+    if (!reachPixels.ok) return err(at(reachPixels.error));
+    if (moveSpeed.value <= MIN_WEIGHT || reachPixels.value <= MIN_WEIGHT) {
+      return err(at('a Melee enemy needs a move speed and a reach above zero'));
+    }
+    return ok({
+      kind: 'Melee',
+      moveSpeedPixelsPerSecond: moveSpeed.value,
+      damage: damage.value,
+      attackRate: attackRate.value,
+      reachPixels: reachPixels.value,
+    });
+  }
+
+  const projectileSpeed = readField.number(raw, 'projectileSpeed');
+  if (!projectileSpeed.ok) return err(at(projectileSpeed.error));
+  const rangePixels = readField.number(raw, 'rangePixels');
+  if (!rangePixels.ok) return err(at(rangePixels.error));
+  if (projectileSpeed.value <= MIN_WEIGHT || rangePixels.value <= MIN_WEIGHT) {
+    return err(at('a StationaryRanged enemy needs a projectile speed and a range above zero'));
+  }
+  return ok({
+    kind: 'StationaryRanged',
+    damage: damage.value,
+    attackRate: attackRate.value,
+    projectileSpeed: projectileSpeed.value,
+    rangePixels: rangePixels.value,
   });
 }

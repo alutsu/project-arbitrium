@@ -11,6 +11,13 @@ const GRUNT = {
   goldReward: 9,
   roomTags: ['Arena', 'Corridor'],
   prefers: ['Open', 'Cover'],
+  behaviour: {
+    kind: 'Melee',
+    moveSpeedPixelsPerSecond: 95,
+    damage: 7,
+    attackRate: 0.9,
+    reachPixels: 34,
+  },
 };
 
 const errorOf = (raw: unknown): string => {
@@ -47,6 +54,39 @@ describe('parseEnemies', () => {
     expect(errorOf([{ ...GRUNT, tier: 'Mythic' }])).toContain('tier');
     expect(errorOf([{ ...GRUNT, roomTags: ['Cathedral'] }])).toContain('roomTags');
     expect(errorOf([{ ...GRUNT, prefers: ['Ceiling'] }])).toContain('prefers');
+  });
+
+  it('parses a stationary ranged behaviour', () => {
+    const turret = {
+      ...GRUNT,
+      id: 'turret',
+      behaviour: {
+        kind: 'StationaryRanged',
+        damage: 5,
+        attackRate: 0.7,
+        projectileSpeed: 300,
+        rangePixels: 340,
+      },
+    };
+    const outcome = parseEnemies([turret]);
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.value[0]?.behaviour.kind).toBe('StationaryRanged');
+  });
+
+  it('rejects a behaviour missing the fields its kind needs', () => {
+    const noReach = { ...GRUNT, behaviour: { ...GRUNT.behaviour, reachPixels: 0 } };
+    expect(errorOf([noReach])).toContain('reach');
+    const noRange = {
+      ...GRUNT,
+      behaviour: { kind: 'StationaryRanged', damage: 5, attackRate: 1, projectileSpeed: 300 },
+    };
+    expect(errorOf([noRange])).toContain('rangePixels');
+  });
+
+  it('rejects an enemy that cannot hurt anyone', () => {
+    expect(errorOf([{ ...GRUNT, behaviour: { ...GRUNT.behaviour, damage: 0 } }])).toContain(
+      'damage',
+    );
   });
 
   it('names the offending index', () => {

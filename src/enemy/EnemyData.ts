@@ -1,6 +1,7 @@
 import type { EnemyTier } from '../bargain/BargainDemand';
 import type { RoomTag } from '../dungeon/RoomTemplate';
 import type { TileKind } from '../dungeon/TileKind';
+import type { EnemyBehaviourData } from './EnemyBehaviourData';
 
 /** Branded so an enemy id cannot be passed where another entity id is expected. */
 export type EnemyId = string & { readonly __brand: 'EnemyId' };
@@ -24,4 +25,6 @@ export interface EnemyData {
   readonly goldReward: number;
   readonly roomTags: readonly RoomTag[];
   readonly prefers: readonly TileKind[];
+  /** How it acts in combat (GDD 5.1, 5.2). */
+  readonly behaviour: EnemyBehaviourData;
 }

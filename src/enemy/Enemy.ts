@@ -5,6 +5,7 @@ import type { Damageable } from '../combat/Damageable';
 import { angleBetween } from '../math/angleBetween';
 import type { Vector2 } from '../math/Vector2';
 import type { EnemyData } from './EnemyData';
+import { EnemyBrain } from './EnemyBrain';
 
 const DEAD = 0;
 /** Enough drag that a knocked-back enemy settles rather than sliding forever. */
@@ -14,28 +15,56 @@ const DRAG = 900;
  * An enemy present in the room. It holds its sprite by composition rather than
  * subclassing one, per GDD 9.2 and CLAUDE.md 5.
  *
- * It can be bargained with (2.2) and hurt (5.1). It has no behaviour tree yet: that is
- * GDD 5.2, and it is the next sprint.
+ * It can be bargained with (2.2), hurt (5.1), and acts through its own `EnemyBrain`
+ * (5.2). The brain is pure; this class is the Phaser-facing half.
  */
-export class Enemy implements Bargainable, Damageable {
-  private vitality: number;
+export interface EnemySpec {
+  readonly sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
+  readonly data: EnemyData;
+  readonly demand: BargainDemand;
+  /** The Notice window this enemy observes on entry (GDD 4.1.1). */
+  readonly aggroDelayMs: number;
+}
 
-  public constructor(
-    private readonly sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
-    public readonly data: EnemyData,
-    public readonly demand: BargainDemand,
-  ) {
-    this.vitality = data.vitality;
-    sprite.setDrag(DRAG);
-    sprite.setCollideWorldBounds(true);
+export class Enemy implements Bargainable, Damageable {
+  public readonly brain: EnemyBrain;
+  public readonly data: EnemyData;
+  public readonly demand: BargainDemand;
+
+  private readonly sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
+  private vitality: number;
+  private retired = false;
+
+  public constructor(spec: EnemySpec) {
+    this.sprite = spec.sprite;
+    this.data = spec.data;
+    this.demand = spec.demand;
+    this.brain = new EnemyBrain(spec.data.behaviour, spec.aggroDelayMs);
+    this.vitality = spec.data.vitality;
+    spec.sprite.setDrag(DRAG);
+    spec.sprite.setCollideWorldBounds(true);
   }
 
   public get position(): Vector2 {
     return { x: this.sprite.x, y: this.sprite.y };
   }
 
+  /**
+   * Still in play, and still something a weapon can hurt.
+   *
+   * False once the enemy has died *or* been paid off. A bargained enemy that reported
+   * itself alive kept striking from where it stood, and kept absorbing bullets.
+   */
   public get isAlive(): boolean {
-    return this.vitality > DEAD;
+    return this.vitality > DEAD && !this.retired;
+  }
+
+  public moveWith(velocity: Vector2): void {
+    this.sprite.setVelocity(velocity.x, velocity.y);
+  }
+
+  public halt(): void {
+    this.sprite.setVelocity(0, 0);
   }
 
   public takeHit(damage: number, knockback: number, from: Vector2): void {
@@ -64,6 +93,7 @@ export class Enemy implements Bargainable, Damageable {
    * the scene destroys the sprites when the room changes.
    */
   private retire(): void {
+    this.retired = true;
     this.sprite.disableBody(true, true);
   }
 }

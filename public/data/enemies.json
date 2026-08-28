@@ -8,7 +8,14 @@
     "roomTags": ["Arena", "Corridor"],
     "prefers": ["Open", "Cover"],
     "vitality": 18,
-    "goldReward": 9
+    "goldReward": 9,
+    "behaviour": {
+      "kind": "Melee",
+      "moveSpeedPixelsPerSecond": 95,
+      "damage": 7,
+      "attackRate": 0.9,
+      "reachPixels": 34
+    }
   },
   {
     "id": "turret",
@@ -19,6 +26,13 @@
     "roomTags": ["Arena"],
     "prefers": ["Corner"],
     "vitality": 30,
-    "goldReward": 14
+    "goldReward": 14,
+    "behaviour": {
+      "kind": "StationaryRanged",
+      "damage": 5,
+      "attackRate": 0.7,
+      "projectileSpeed": 300,
+      "rangePixels": 340
+    }
   }
 ]

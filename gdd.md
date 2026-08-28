@@ -30,7 +30,9 @@ The target demographic consists of "Hardcore Adaptors"—players who enjoy the f
 
 > **Implementation note.** Doors seal on entry and unlock when the room is cleared. A room clears when nothing in it is left to bargain with, whether it was killed or paid off, and either way the Weapon Pedestal then rises.
 >
-> Both halves of the choice now exist: weapons fire, enemies have Vitality, and a kill pays Gold that a Parley never does. What is still missing is enemies fighting *back* — they have no behaviour tree yet (5.2), so they stand still and absorb damage. Until that lands, the risk half of "fight or bargain" is priced at zero.
+> Both halves of the choice now exist and both carry risk: weapons fire, enemies have Vitality and pay Gold when killed, and enemies fight back under the states in 5.2. A run can now be lost to combat as well as to a fatal bargain.
+>
+> What remains unbuilt is content rather than mechanism: the Rare roster in 5.1, and the Boss, which has no design in this document beyond 2.2.2's "cannot be bargained with".
 
 The fundamental atomic unit of *Project Arbitrium* is the "Room." The loop within a single room is a microcosm of the entire game's economy.
 
@@ -386,12 +388,20 @@ To ensure "Total Randomness" feels fair:
 
 Every enemy carries `vitality`, which is how much damage it absorbs, and `goldReward`, which it drops when killed. Bargaining pays none of it (2.2.2).
 
-* **Normal:** Grunt (Melee), Turret (Stationary Ranged). Grunt 18 Vitality for 9 Gold; Turret 30 for 14. First-pass values.
+* **Normal:** Grunt (Melee), Turret (Stationary Ranged). Grunt 18 Vitality for 9 Gold, closing at 95 px/sec to strike 7 at 0.9/sec within 34 px. Turret 30 Vitality for 14 Gold, stationary, firing 5 damage at 0.7/sec out to 340 px. First-pass values.
 * **Rare:** Blink-Stalker (Teleport), Alchemist (AOE Potion).
 
 ### 5.2 AI Behavior Trees
 
-A custom Behavior Tree utility class or an external state machine library will handle "Combat" vs "Bargaining" states in the enemy sprites.
+Each enemy owns an `EnemyBrain`: a small state machine rather than a behaviour-tree library, since three states need no framework. It is Phaser-free and returns an action the scene carries out, so every state and transition is unit-tested.
+
+States, checked in order:
+
+* **Notice** — for `aggroDelayMs` after the player enters, the enemy is alert but does not act. This gives the Parley Window in 2.1 real teeth: it is a genuine grace period, not merely a cheaper price.
+* **Bargaining** — while the player holds Parley and this enemy is inside the Sphere of Influence, it holds. Negotiating and attacking are not the same activity, so mercy protects while it is being offered. This is what makes the Run Saver in 2.2.2 real: a player at 16 Vitality can hold Parley and stop the beating.
+* **Combat** — a Melee enemy paths toward the player with A* (6.1 step 2, which this is the first consumer of) and strikes at its attack rate once in reach; a StationaryRanged enemy holds position and fires when the player is inside its range.
+
+Note the consequence: Parley stays the hand of anything **inside** the Sphere, but a Turret shooting from across the room is untouched by it. Distance is its own defence.
 
 ---
 

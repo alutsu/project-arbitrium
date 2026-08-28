@@ -49,6 +49,13 @@ const enemy = (shape: EnemyShape): EnemyData => ({
   goldReward: 9,
   roomTags: shape.roomTags,
   prefers: shape.prefers,
+  behaviour: {
+    kind: 'Melee',
+    moveSpeedPixelsPerSecond: 95,
+    damage: 7,
+    attackRate: 1,
+    reachPixels: 34,
+  },
 });
 
 const GRUNT = enemy({ id: 'grunt', roomTags: ['Arena', 'Corridor'], prefers: ['Open', 'Cover'] });
