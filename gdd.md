@@ -220,7 +220,17 @@ The `EncounterDirector` consults the JSON `LootTable` of enemies.
 
 ### 3.3 Input System & Player Controller
 
-* **Actions:** `Move` (WASD/Analog), `Aim` (Mouse pointer/Right stick), `Attack` (Click), `Bargain` (Hold Spacebar/Trigger), `Interact` (E), `Sell` (R). Configured using `this.input.keyboard` and `this.input.on('pointerdown')` in the main Scene.
+* **Actions:** `Move` (WASD/Analog), `Aim` (Mouse pointer/Right stick), `Attack` (Click), `Bargain` (Hold Spacebar/Trigger), `Interact` (E), `Sell` (R). Bound once from `this.input.keyboard` and the scene's active pointer.
+* **Architecture:** Devices sit behind an `InputSource` that reports one frame of intent as an `InputIntent` snapshot: held actions (Move, Aim, Attack, Bargain) plus edge-detected one-shots (Interact, Sell). The `PlayerController` consumes that snapshot and drives a narrow `PlayerActor` interface, so it neither reads Phaser input nor owns a sprite. Held actions are polled per frame rather than event-driven, which is what lets Attack and Bargain be sustained without listener bookkeeping.
+
+#### 3.3.1 Player Controller Constants
+
+| Constant | Value | Rationale |
+| --- | --- | --- |
+| Base Move Speed | 220 px/sec | Crosses the 1280x720 logical room in ~6 seconds; fast enough to reposition, slow enough that Tier 1 projectiles stay dodgeable. First-pass value, to be revisited in Sprint 10 (Economic Balancing). |
+| Parley Movement Penalty | 30% | The physical cost of holding Parley (see 2.2.1). |
+| Diagonal Handling | Input magnitude clamped to 1 | A diagonal must not outrun a cardinal, while a partial analog tilt still moves at partial speed. |
+| Logical Resolution | 1280x720 | Fixed world units; the canvas is scaled to fit the window. |
 
 ---
 
