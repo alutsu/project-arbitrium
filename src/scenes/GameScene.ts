@@ -27,6 +27,7 @@ import { ProjectilePool } from '../combat/ProjectilePool';
 import { WeaponController, type Attack } from '../combat/WeaponController';
 import { angleBetween } from '../math/angleBetween';
 import { SwingView } from '../ui/SwingView';
+import { ControlsView } from '../ui/ControlsView';
 import { DefeatView } from '../ui/DefeatView';
 import { FeedbackView } from '../ui/FeedbackView';
 import { GameSounds } from '../audio/GameSounds';
@@ -155,6 +156,7 @@ export class GameScene extends Phaser.Scene {
   private weaponController: WeaponController | null = null;
   private swingView: SwingView | null = null;
   private defeatView: DefeatView | null = null;
+  private controlsView: ControlsView | null = null;
   private feedback: FeedbackView | null = null;
   private sounds: GameSounds | null = null;
   private enemyCollider: Phaser.Physics.Arcade.Collider | null = null;
@@ -258,6 +260,7 @@ export class GameScene extends Phaser.Scene {
     this.feedback = new FeedbackView(this, DEPTH_FEEDBACK, SPARK_TEXTURE_KEY);
     this.sounds = new GameSounds(this.sound);
     this.hud = new ResourceHud(this, DEPTH_HUD);
+    this.controlsView = new ControlsView(this, DEPTH_HUD);
 
     this.enterRoom(this.dungeon.start, null);
 
@@ -884,6 +887,7 @@ export class GameScene extends Phaser.Scene {
     this.enemyCollider?.destroy();
     this.roomView?.destroy();
     this.hud?.destroy();
+    this.controlsView?.destroy();
     this.wallCollider?.destroy();
     for (const grunt of this.enemySprites) {
       grunt.destroy();
@@ -915,6 +919,7 @@ export class GameScene extends Phaser.Scene {
     this.offered = null;
     this.roomView = null;
     this.hud = null;
+    this.controlsView = null;
     this.dungeon = null;
     this.currentRoom = null;
     this.wallCollider = null;

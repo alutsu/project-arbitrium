@@ -317,6 +317,7 @@ Only Normal-tier enemies ship so far. The Rare roster in 5.1 — Blink-Stalker a
 ### 3.3 Input System & Player Controller
 
 * **Actions:** `Move` (WASD/Analog), `Aim` (Mouse pointer/Right stick), `Attack` (Click), `Bargain` (Hold Spacebar/Trigger), `Interact` (E), `Sell` (R), `Select` (1-3, for a numbered choice such as a Forge shelf entry). Bound once from `this.input.keyboard` and the scene's active pointer.
+* **On screen:** the bindings are listed permanently in the bottom-left corner, in the game's own vocabulary — the player holds *Parley*, not "hold to interact". The Pedestal and the Forge print their own prompts when the player is close enough to use them, so the legend stays a standing reference rather than a tutorial.
 * **Architecture:** Devices sit behind an `InputSource` that reports one frame of intent as an `InputIntent` snapshot: held actions (Move, Aim, Attack, Bargain) plus edge-detected one-shots (Interact, Sell). The `PlayerController` consumes that snapshot and drives a narrow `PlayerActor` interface, so it neither reads Phaser input nor owns a sprite. Held actions are polled per frame rather than event-driven, which is what lets Attack and Bargain be sustained without listener bookkeeping.
 
 #### 3.3.1 Player Constants
