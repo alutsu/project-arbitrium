@@ -10,7 +10,8 @@
     "knockbackForce": 40,
     "projectileSpriteKey": "projectile_bullet",
     "projectileSpeed": 520,
-    "projectileCount": 1
+    "projectileCount": 1,
+    "goldValue": 25
   },
   {
     "id": "scrap_scattergun",
@@ -23,7 +24,8 @@
     "knockbackForce": 160,
     "projectileSpriteKey": "projectile_pellet",
     "projectileSpeed": 420,
-    "projectileCount": 5
+    "projectileCount": 5,
+    "goldValue": 35
   },
   {
     "id": "chipped_sabre",
@@ -35,7 +37,8 @@
     "attackRate": 2.2,
     "knockbackForce": 90,
     "swingArc": 100,
-    "lungeAmount": 28
+    "lungeAmount": 28,
+    "goldValue": 30
   },
   {
     "id": "pitted_maul",
@@ -47,6 +50,7 @@
     "attackRate": 0.8,
     "knockbackForce": 260,
     "swingArc": 70,
-    "lungeAmount": 12
+    "lungeAmount": 12,
+    "goldValue": 45
   }
 ]

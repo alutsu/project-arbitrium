@@ -2,6 +2,7 @@ import { err, ok, type Result } from '../core/Result';
 import { isJsonRecord } from './JsonRecord';
 import { readField } from './readField';
 import type { PlayerStats } from './PlayerStats';
+import type { WeaponId } from './WeaponData';
 
 const MIN_PENALTY = 0;
 const MAX_PENALTY = 1;
@@ -39,10 +40,22 @@ export function parsePlayerStats(raw: unknown): Result<PlayerStats> {
     return err('player.json: "maxVitality" must be at least 1');
   }
 
+  const startingWeaponId = readField.string(raw, 'startingWeaponId');
+  if (!startingWeaponId.ok) return err(`player.json: ${startingWeaponId.error}`);
+
+  const interactReachPixels = readField.number(raw, 'interactReachPixels');
+  if (!interactReachPixels.ok) return err(`player.json: ${interactReachPixels.error}`);
+  if (interactReachPixels.value <= MIN_SPEED) {
+    return err('player.json: "interactReachPixels" must be greater than zero');
+  }
+
   return ok({
     moveSpeedPixelsPerSecond: moveSpeed.value,
     parleyMovementPenalty: penalty.value,
     startingGold: startingGold.value,
     maxVitality: maxVitality.value,
+    // Safe to brand: proven a non-empty string here, proven to exist by GameDatabase.
+    startingWeaponId: startingWeaponId.value as WeaponId,
+    interactReachPixels: interactReachPixels.value,
   });
 }

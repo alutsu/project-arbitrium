@@ -13,12 +13,18 @@ import { DungeonGenerator } from '../dungeon/DungeonGenerator';
 import { oppositeOf, stepFrom, type Direction } from '../dungeon/Direction';
 import { coordinateKey, type GridCoordinate } from '../dungeon/GridCoordinate';
 import { isAtExit } from '../dungeon/isAtExit';
+import { FloorProgress } from '../dungeon/FloorProgress';
 import { sealedRoomOf } from '../dungeon/sealedRoomOf';
+import { resolveLiquidation, type LiquidationChoice } from '../liquidation/LiquidationService';
+import type { WeaponData } from '../data/WeaponData';
+import { WeaponSlot } from '../weapon/WeaponSlot';
+import { PedestalView } from '../ui/PedestalView';
 import { exitTowards, type RoomTemplate } from '../dungeon/RoomTemplate';
 import { Enemy } from '../enemy/Enemy';
 import { EncounterDirector } from '../encounter/EncounterDirector';
 import { roomSeed } from '../encounter/roomSeed';
 import { RoomAnalyzer } from '../dungeon/RoomAnalyzer';
+import type { InputIntent } from '../input/InputIntent';
 import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { ArcadePlayerActor } from '../player/ArcadePlayerActor';
 import { PlayerController } from '../player/PlayerController';
@@ -72,11 +78,16 @@ const TILESET_TILE_COUNT = 2;
  * after the player and the HUD; without explicit depths it would cover them.
  */
 const DEPTH_TERRAIN = 0;
+/** Below entities, so the player is not hidden by a pedestal they are standing on. */
+const DEPTH_PEDESTAL = 5;
 const DEPTH_ENTITIES = 10;
 const DEPTH_PARLEY = 20;
 const DEPTH_HUD = 30;
 
+/** Salt so the weapon offered in a room draws from a different stream than its enemies. */
+const WEAPON_STREAM_SALT = 0x5eed;
 const NO_TIME = 0;
+const NONE = 0;
 
 /**
  * Root gameplay scene. Wiring only (CLAUDE.md 3.1): it builds the systems, reads input
@@ -100,6 +111,11 @@ export class GameScene extends Phaser.Scene {
   private readonly analyzer = new RoomAnalyzer();
   private director: EncounterDirector | null = null;
   private floorSeed = NO_TIME;
+  private database: GameDatabase | null = null;
+  private readonly progress = new FloorProgress();
+  private weaponSlot: WeaponSlot | null = null;
+  private offered: WeaponData | null = null;
+  private pedestalView: PedestalView | null = null;
   private roomElapsedMs = NO_TIME;
 
   public constructor() {
@@ -143,6 +159,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.dungeon = floor.value;
     this.floorSeed = database.dungeon.seed;
+    this.database = database;
+    this.weaponSlot = new WeaponSlot(database.startingWeapon());
 
     this.createTextures();
     this.playerSprite = this.createPlayerSprite();
@@ -165,6 +183,7 @@ export class GameScene extends Phaser.Scene {
       DEPTH_PARLEY,
     );
     this.roomView = new RoomView(this, TILESET_TEXTURE_KEY);
+    this.pedestalView = new PedestalView(this, DEPTH_PEDESTAL);
     this.hud = new ResourceHud(this, DEPTH_HUD);
 
     this.enterRoom(this.dungeon.start, null);
@@ -199,11 +218,94 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.parleyView?.render(frame, actor.position.x, actor.position.y);
-    this.hud?.render(parley.state, room === null ? '' : roomLabel(room));
+    this.hud?.render(
+      parley.state,
+      room === null ? '' : roomLabel(room),
+      this.weaponSlot === null ? '' : `Weapon ${this.weaponSlot.weapon.name}`,
+    );
 
-    if (room !== null) {
+    if (room === null) {
+      return;
+    }
+    this.settleClearance(room, parley.bargainableCount);
+    this.offerPedestal(room, actor.position, intent);
+    // Doors stay sealed until the room is cleared (GDD 2.1).
+    if (this.progress.isCleared(room.coordinate)) {
       this.followExits(room, actor.position);
     }
+  }
+
+  /** A room is cleared once nothing in it is left to bargain with (GDD 2.1 phase 4). */
+  private settleClearance(room: DungeonRoom, remaining: number): void {
+    if (remaining > NONE || this.progress.isCleared(room.coordinate)) {
+      return;
+    }
+    this.progress.markCleared(room.coordinate);
+    this.offered = this.weaponOffered(room);
+  }
+
+  /**
+   * Runs the Liquidation choice (GDD 2.3.1): E takes the offered weapon and drops the
+   * one held, R dissolves the offer into gold.
+   */
+  private offerPedestal(room: DungeonRoom, playerAt: GridCoordinate, intent: InputIntent): void {
+    const offered = this.offered;
+    const slot = this.weaponSlot;
+    const reach = this.database?.playerStats.interactReachPixels;
+    if (offered === null || slot === null || reach === undefined) {
+      this.pedestalView?.hide();
+      return;
+    }
+
+    const at = this.pedestalPointFor(room);
+    const withinReach = Math.hypot(at.x - playerAt.x, at.y - playerAt.y) <= reach;
+    this.pedestalView?.show(offered, at, withinReach);
+    if (!withinReach) {
+      return;
+    }
+
+    const choice = liquidationChoiceOf(intent);
+    if (choice === null) {
+      return;
+    }
+    const parley = this.parleySystem;
+    if (parley === null) {
+      return;
+    }
+    const result = resolveLiquidation({
+      choice,
+      offered,
+      slot,
+      resources: parley.resources,
+    });
+    this.weaponSlot = result.slot;
+    parley.replaceResources(result.resources);
+    this.progress.markLiquidated(room.coordinate);
+    this.offered = null;
+    this.pedestalView?.hide();
+  }
+
+  /**
+   * The pedestal sits at the room's centre. GDD 6.1 step 5 says "at exit coordinates",
+   * but a connector-based room has up to four exits, so there is no single exit to sit
+   * at; the centre is reachable whichever door the player leaves by.
+   */
+  private pedestalPointFor(room: DungeonRoom): GridCoordinate {
+    const { template } = room;
+    return {
+      x: template.widthInTiles * template.tileWidth * CENTER_FACTOR,
+      y: template.heightInTiles * template.tileHeight * CENTER_FACTOR,
+    };
+  }
+
+  /** The weapon this room offers, drawn from its own seeded stream (GDD 2.3.1). */
+  private weaponOffered(room: DungeonRoom): WeaponData | null {
+    const weapons = this.database?.weapons;
+    if (weapons === undefined || weapons.length === NONE) {
+      return null;
+    }
+    const rng = new SeededRng(roomSeed(this.floorSeed ^ WEAPON_STREAM_SALT, room.coordinate));
+    return weapons[rng.nextInt(weapons.length)] ?? null;
   }
 
   /** Steps to the next room when the player stands on a door that leads somewhere. */
@@ -247,7 +349,13 @@ export class GameScene extends Phaser.Scene {
     sprite.setPosition(spawn.x, spawn.y);
     sprite.setVelocity(0, 0);
 
-    this.repopulateRoom(room, sealed);
+    if (this.progress.isCleared(room.coordinate)) {
+      this.clearEnemySprites();
+      this.offered = this.progress.isLiquidated(room.coordinate) ? null : this.weaponOffered(room);
+    } else {
+      this.offered = null;
+      this.repopulateRoom(room, sealed);
+    }
   }
 
   /** Centre of the room on arrival at the entrance, otherwise clear of the door used. */
@@ -281,11 +389,7 @@ export class GameScene extends Phaser.Scene {
    * encounter rather than a fresh roll.
    */
   private repopulateRoom(room: DungeonRoom, sealed: RoomTemplate): void {
-    for (const sprite of this.enemySprites) {
-      sprite.destroy();
-    }
-    this.enemySprites = [];
-    this.parleySystem?.clear();
+    this.clearEnemySprites();
 
     const director = this.director;
     if (director === null) {
@@ -308,6 +412,14 @@ export class GameScene extends Phaser.Scene {
       this.enemySprites.push(sprite);
       this.parleySystem?.add(new Enemy(sprite, spawn.enemy, spawn.demand));
     }
+  }
+
+  private clearEnemySprites(): void {
+    for (const sprite of this.enemySprites) {
+      sprite.destroy();
+    }
+    this.enemySprites = [];
+    this.parleySystem?.clear();
   }
 
   /** Generates a placeholder texture per sprite key on first use. */
@@ -385,6 +497,7 @@ export class GameScene extends Phaser.Scene {
   private shutdownSystems(): void {
     this.inputSource?.destroy();
     this.parleyView?.destroy();
+    this.pedestalView?.destroy();
     this.roomView?.destroy();
     this.hud?.destroy();
     this.wallCollider?.destroy();
@@ -398,12 +511,23 @@ export class GameScene extends Phaser.Scene {
     this.playerSprite = null;
     this.parleySystem = null;
     this.parleyView = null;
+    this.pedestalView = null;
+    this.database = null;
+    this.weaponSlot = null;
+    this.offered = null;
     this.roomView = null;
     this.hud = null;
     this.dungeon = null;
     this.currentRoom = null;
     this.wallCollider = null;
   }
+}
+
+function liquidationChoiceOf(intent: InputIntent): LiquidationChoice | null {
+  if (intent.isInteracting) {
+    return 'Swap';
+  }
+  return intent.isSelling ? 'Sell' : null;
 }
 
 function roomLabel(room: DungeonRoom): string {

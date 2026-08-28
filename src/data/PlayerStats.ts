@@ -1,3 +1,5 @@
+import type { WeaponId } from './WeaponData';
+
 export interface PlayerStats {
   /** Base movement speed in pixels per second (GDD 3.3.1). */
   readonly moveSpeedPixelsPerSecond: number;
@@ -7,4 +9,8 @@ export interface PlayerStats {
   readonly startingGold: number;
   /** Vitality at the start of a run, and the cap it can be restored to (GDD 4.1.2). */
   readonly maxVitality: number;
+  /** The weapon the run begins with. `GameDatabase` proves it names a real weapon. */
+  readonly startingWeaponId: WeaponId;
+  /** How close the player must be to a Weapon Pedestal to Swap or Sell (GDD 2.3.1). */
+  readonly interactReachPixels: number;
 }

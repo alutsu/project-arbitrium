@@ -2,5 +2,7 @@
   "moveSpeedPixelsPerSecond": 220,
   "parleyMovementPenalty": 0.3,
   "startingGold": 120,
-  "maxVitality": 100
+  "maxVitality": 100,
+  "startingWeaponId": "rusty_pistol",
+  "interactReachPixels": 70
 }

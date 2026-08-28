@@ -4,6 +4,8 @@ import { readField } from './readField';
 import { WEAPON_TAGS } from './WeaponTag';
 import { WEAPON_TYPES, type WeaponData, type WeaponId } from './WeaponData';
 
+const MIN_GOLD_VALUE = 0;
+
 /**
  * Validates the contents of `weapons.json` (GDD 3.1.1). Never trust a cache read to
  * match its interface (CLAUDE.md 2.3): everything arrives as `unknown` and is proven
@@ -46,6 +48,11 @@ function parseWeapon(entry: unknown, index: number): Result<WeaponData> {
   if (!attackRate.ok) return err(at(attackRate.error));
   const knockbackForce = readField.number(entry, 'knockbackForce');
   if (!knockbackForce.ok) return err(at(knockbackForce.error));
+  const goldValue = readField.number(entry, 'goldValue');
+  if (!goldValue.ok) return err(at(goldValue.error));
+  if (goldValue.value <= MIN_GOLD_VALUE) {
+    return err(at('"goldValue" must be greater than zero, or selling it is never a choice'));
+  }
   const type = readField.oneOf(entry, 'type', WEAPON_TYPES);
   if (!type.ok) return err(at(type.error));
 
@@ -58,6 +65,7 @@ function parseWeapon(entry: unknown, index: number): Result<WeaponData> {
     damage: damage.value,
     attackRate: attackRate.value,
     knockbackForce: knockbackForce.value,
+    goldValue: goldValue.value,
   };
 
   const opposite = type.value === 'Ranged' ? 'Melee' : 'Ranged';

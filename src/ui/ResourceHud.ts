@@ -26,13 +26,13 @@ export class ResourceHud {
       .setDepth(depth);
   }
 
-  public render(state: PlayerState, roomLabel: string): void {
+  public render(state: PlayerState, roomLabel: string, weaponLabel: string): void {
     const { resources, pride } = state;
     const humbled = pride.isActive
       ? `    Pride -${String(Math.round(pride.speedPenalty * PERCENT))}% Speed (${roomsWord(pride.roomsRemaining + ROOMS_INCLUSIVE)})`
       : '';
     this.readout.setText(
-      `Gold ${String(resources.gold)}    Vitality ${String(resources.vitality)}    ${roomLabel}${humbled}`,
+      `Gold ${String(resources.gold)}    Vitality ${String(resources.vitality)}    ${weaponLabel}    ${roomLabel}${humbled}`,
     );
     this.defeat.setText(resources.isDefeated ? DEFEAT_MESSAGE : '');
   }

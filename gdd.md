@@ -28,6 +28,8 @@ The target demographic consists of "Hardcore Adaptors"—players who enjoy the f
 
 ### 2.1 The Gameplay Cycle
 
+> **Implementation note.** Doors seal on entry and unlock when the room is cleared, and "cleared" means nothing bargainable remains. Combat is not implemented — weapons do not fire, and the roadmap in 7 never assigns the work — so today the only way to clear a room is to bargain with every enemy in it. That makes the Death Spiral in 2.2.2 the *only* path through a floor rather than one of two, and it is the single largest gap between this document and the build.
+
 The fundamental atomic unit of *Project Arbitrium* is the "Room." The loop within a single room is a microcosm of the entire game's economy.
 
 | Phase | Description | Player Action | System State |
@@ -90,6 +92,14 @@ Instead of forcing the player to take every random weapon, the player can choose
 
 
 * **Design Consequence:** This solves the "Bad RNG" frustration. If the game spawns a "Rusty Pistol" when you have a "Laser Rifle," you aren't forced to downgrade. Instead, you are rewarded with currency. However, "Selling" doesn't refill your ammo/durability (if implemented), forcing you to eventually swap weapons naturally.
+
+**What a weapon is worth.** Each entry in `weapons.json` carries a `goldValue`, which is what Selling pays. Selling never touches the held weapon; Swapping never touches gold. The two choices are therefore strictly a trade of power against currency, with no hidden cost on either side.
+
+**Where the pedestal stands.** 6.1 step 5 says "at exit coordinates", but a connector-based room has up to four exits, so there is no single exit to stand at. The pedestal rises at the **room's centre**, which is reachable whichever door the player leaves by, and the player must be within `interactReachPixels` to Swap or Sell.
+
+**One offer per room.** A room offers its weapon once. The offer is drawn from a seed derived from the floor seed and the room's slot, on a separate stream from the room's encounter, so re-entering a room does not re-roll or re-offer it.
+
+Weapons are still whole entries from `weapons.json`. The part-based assembly in 2.3.2 and the tiers in 4.2 are not built yet, and the roadmap in 7 does not assign them to a sprint — worth scheduling before content expansion.
 
 #### 2.3.2 Expanded Weapon Generation (Ranged & Melee)
 
@@ -293,6 +303,8 @@ Only Normal-tier enemies ship so far. The Rare roster in 5.1 — Blink-Stalker a
 | Logical Resolution | 1280x720 | Fixed world units; the canvas is scaled to fit the window. |
 | Starting Gold | 120 | The pool a Gold demand takes its cut from (4.1.2). First-pass value. |
 | Max Vitality | 100 | Starting and maximum Vitality; the pool a Vitality demand draws down (4.1.2). |
+| Starting Weapon | `rusty_pistol` | The weapon a run begins with. `GameDatabase` refuses to load if it names no real weapon. |
+| Interact Reach | 70 px | How close the player must stand to a Weapon Pedestal to Swap or Sell (2.3.1). |
 
 ---
 
@@ -367,7 +379,7 @@ A custom Behavior Tree utility class or an external state machine library will h
 2. **Baking:** `NavigationGrid` bakes walkability from the room as placed, and `findPath` runs A* over it, four-directional so a route never cuts a wall corner. **Implemented in Sprint 5.** Written in-house rather than via EasyStar.js — the GDD named that only as an example, and a grid A* is small enough that owning it keeps navigation Phaser-free, dependency-free and unit-testable. It has no consumer until enemies gain behaviour in 5.2.
 3. **Analysis Pass:** `RoomAnalyzer` classifies tiles as Cover, Open or Corner (3.2.2). **Implemented in Sprint 5.**
 4. **Director Pass:** `EncounterDirector` selects enemies by room tag and places them by tile kind (3.2.3). **Implemented in Sprint 5.**
-5. **Weapon Spawning:** `WeaponPedestal` sprite placed at exit coordinates.
+5. **Weapon Spawning:** the pedestal rises once the room is cleared. **Implemented in Sprint 6**, at the room's centre rather than at an exit — see the note in 2.3.1.
 
 ---
 

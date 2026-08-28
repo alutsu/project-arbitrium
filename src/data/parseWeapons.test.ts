@@ -10,6 +10,7 @@ const RANGED = {
   damage: 6,
   attackRate: 4,
   knockbackForce: 40,
+  goldValue: 25,
   projectileSpriteKey: 'projectile_bullet',
   projectileSpeed: 520,
   projectileCount: 1,
@@ -24,6 +25,7 @@ const MELEE = {
   damage: 11,
   attackRate: 2.2,
   knockbackForce: 90,
+  goldValue: 30,
   swingArc: 100,
   lungeAmount: 28,
 };
@@ -68,6 +70,11 @@ describe('parseWeapons', () => {
 
   it('rejects a melee weapon carrying projectile fields instead of swing fields', () => {
     expect(errorOf([{ ...omit(MELEE, 'swingArc'), projectileSpeed: 400 }])).toContain('swingArc');
+  });
+
+  it('rejects a weapon that cannot be sold', () => {
+    expect(errorOf([{ ...RANGED, goldValue: 0 }])).toContain('goldValue');
+    expect(errorOf([omit(RANGED, 'goldValue')])).toContain('goldValue');
   });
 
   it('rejects an unknown tag', () => {

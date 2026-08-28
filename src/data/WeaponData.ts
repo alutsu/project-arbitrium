@@ -11,6 +11,8 @@ interface WeaponBase {
   readonly damage: number;
   readonly attackRate: number;
   readonly knockbackForce: number;
+  /** What the pedestal pays for this weapon if it is sold rather than taken (GDD 2.3.1). */
+  readonly goldValue: number;
 }
 
 /**

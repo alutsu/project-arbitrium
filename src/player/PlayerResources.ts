@@ -18,6 +18,11 @@ export class PlayerResources {
     return new PlayerResources(Math.max(MIN_GOLD, this.gold - spent), this.vitality);
   }
 
+  /** Gold from selling a weapon at the pedestal (GDD 2.3.1). */
+  public gainGold(amount: number): PlayerResources {
+    return new PlayerResources(this.gold + amount, this.vitality);
+  }
+
   public loseVitality(damage: number): PlayerResources {
     return new PlayerResources(this.gold, Math.max(MIN_VITALITY, this.vitality - damage));
   }

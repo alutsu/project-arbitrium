@@ -10,6 +10,8 @@ const STATS: PlayerStats = {
   parleyMovementPenalty: 0.3,
   startingGold: 120,
   maxVitality: 100,
+  startingWeaponId: 'sabre' as WeaponId,
+  interactReachPixels: 70,
 };
 
 const weapon = (id: string): WeaponData => ({
@@ -21,6 +23,7 @@ const weapon = (id: string): WeaponData => ({
   damage: 10,
   attackRate: 2,
   knockbackForce: 50,
+  goldValue: 30,
   swingArc: 90,
   lungeAmount: 20,
 });
@@ -67,6 +70,11 @@ const build = (weapons: WeaponData[], upgrades: UpgradeData[]): GameDatabase => 
 };
 
 describe('GameDatabase', () => {
+  it('hands back the starting weapon it validated', () => {
+    const database = build([weapon('sabre')], []);
+    expect(database.startingWeapon().id).toBe('sabre');
+  });
+
   it('looks records up by id', () => {
     const database = build([weapon('sabre')], [upgrade('phase_blade')]);
     expect(database.weapon('sabre' as WeaponId).name).toBe('sabre');
@@ -88,12 +96,27 @@ describe('GameDatabase', () => {
     expect(() => database.upgrade('missing' as UpgradeId)).toThrow('missing');
   });
 
+  it('refuses a starting weapon that no weapon defines', () => {
+    const outcome = GameDatabase.create({
+      weapons: [weapon('maul')],
+      upgrades: [],
+      playerStats: STATS,
+      bargain: BARGAIN,
+      dungeon: DUNGEON,
+      roomTemplates: [],
+      enemies: [],
+      encounter: { minEnemiesPerRoom: 1, maxEnemiesPerRoom: 3, spawnClearanceTiles: 4 },
+    });
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.error).toContain('sabre');
+  });
+
   it('refuses to build with duplicate ids', () => {
     const weapons = create([weapon('sabre'), weapon('sabre')], []);
     expect(weapons.ok).toBe(false);
     if (!weapons.ok) expect(weapons.error).toContain('duplicate weapon id "sabre"');
 
-    const upgrades = create([], [upgrade('grip'), upgrade('grip')]);
+    const upgrades = create([weapon('sabre')], [upgrade('grip'), upgrade('grip')]);
     expect(upgrades.ok).toBe(false);
     if (!upgrades.ok) expect(upgrades.error).toContain('duplicate upgrade id "grip"');
   });

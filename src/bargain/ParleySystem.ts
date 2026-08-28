@@ -53,6 +53,16 @@ export class ParleySystem {
     this.bargainables.push(bargainable);
   }
 
+  /** Applies resources changed elsewhere, such as gold taken at a Weapon Pedestal. */
+  public replaceResources(resources: PlayerResources): void {
+    this.currentState = { ...this.currentState, resources };
+  }
+
+  /** How many enemies are still in the room; zero means it is cleared (GDD 2.1). */
+  public get bargainableCount(): number {
+    return this.bargainables.length;
+  }
+
   /** Forgets every bargainable, for when the player leaves the room they were in. */
   public clear(): void {
     this.bargainables.length = 0;

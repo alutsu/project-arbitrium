@@ -52,6 +52,14 @@ export class GameDatabase {
       upgradesById.set(upgrade.id, upgrade);
     }
 
+    // Cross-record check: a starting weapon naming nothing would only surface as an
+    // undefined the first time a run began.
+    if (!weaponsById.has(records.playerStats.startingWeaponId)) {
+      return err(
+        `player.json names a starting weapon "${records.playerStats.startingWeaponId}" that weapons.json does not define`,
+      );
+    }
+
     return ok(new GameDatabase(weaponsById, upgradesById, records));
   }
 
@@ -85,6 +93,11 @@ export class GameDatabase {
 
   public get upgrades(): readonly UpgradeData[] {
     return [...this.upgradesById.values()];
+  }
+
+  /** The weapon a run begins with, proven to exist when the database was built. */
+  public startingWeapon(): WeaponData {
+    return this.weapon(this.records.playerStats.startingWeaponId);
   }
 
   public weapon(id: WeaponId): WeaponData {

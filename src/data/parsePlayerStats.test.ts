@@ -6,6 +6,8 @@ const STATS = {
   parleyMovementPenalty: 0.3,
   startingGold: 120,
   maxVitality: 100,
+  startingWeaponId: 'rusty_pistol',
+  interactReachPixels: 70,
 };
 
 const errorOf = (raw: unknown): string => {
@@ -25,6 +27,11 @@ describe('parsePlayerStats', () => {
 
   it('rejects a move speed that would leave the player unable to move', () => {
     expect(errorOf({ ...STATS, moveSpeedPixelsPerSecond: 0 })).toContain('greater than zero');
+  });
+
+  it('requires a starting weapon and a usable interaction reach', () => {
+    expect(errorOf({ ...STATS, startingWeaponId: '' })).toContain('startingWeaponId');
+    expect(errorOf({ ...STATS, interactReachPixels: 0 })).toContain('interactReachPixels');
   });
 
   it('rejects a parley penalty outside the range that makes sense', () => {
