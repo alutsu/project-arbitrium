@@ -20,7 +20,9 @@ export type EnemyAction =
       readonly speed: number;
       readonly rangePixels: number;
       readonly damage: number;
-    };
+      readonly hitRadiusPixels: number;
+    }
+  | { readonly kind: 'teleport'; readonly to: Vector2 };
 
 export interface EnemyContext {
   readonly selfPosition: Vector2;
@@ -50,6 +52,7 @@ export interface EnemyContext {
  */
 export class EnemyBrain {
   private readonly cooldown = new AttackCooldown();
+  private readonly blinkCooldown = new AttackCooldown();
 
   public constructor(
     private readonly behaviour: EnemyBehaviourData,
@@ -58,11 +61,62 @@ export class EnemyBrain {
 
   public decide(context: EnemyContext): EnemyAction {
     this.cooldown.tick(context.deltaMs);
+    this.blinkCooldown.tick(context.deltaMs);
 
     if (context.roomElapsedMs <= this.aggroDelayMs || context.isNegotiating) {
       return HOLD;
     }
-    return this.behaviour.kind === 'Melee' ? this.fight(context) : this.shoot(context);
+    if (this.behaviour.kind === 'Melee') {
+      return this.fight(context);
+    }
+    return this.behaviour.kind === 'Blink' ? this.blink(context) : this.shoot(context);
+  }
+
+  /**
+   * The Blink-Stalker (GDD 5.1): it does not walk. When out of reach it waits for its
+   * blink to come up, then jumps several tiles along the path to the player, which lets
+   * it cross cover that would stop anything else.
+   */
+  private blink(context: EnemyContext): EnemyAction {
+    if (this.behaviour.kind !== 'Blink') {
+      return HOLD;
+    }
+    if (distance(context.selfPosition, context.playerPosition) <= this.behaviour.reachPixels) {
+      if (!this.cooldown.isReady) {
+        return HOLD;
+      }
+      this.cooldown.spend(this.behaviour.attackRate);
+      return { kind: 'strike', damage: this.behaviour.damage };
+    }
+    if (!this.blinkCooldown.isReady) {
+      return HOLD;
+    }
+    const landing = this.landingFor(context, this.behaviour.blinkStepTiles);
+    if (landing === undefined) {
+      return HOLD;
+    }
+    this.blinkCooldown.spend(this.behaviour.blinkRate);
+    return { kind: 'teleport', to: landing };
+  }
+
+  /** The tile a blink lands on: as far along the path as the blink reaches. */
+  private landingFor(context: EnemyContext, stepTiles: number): Vector2 | undefined {
+    const path = findPath(
+      context.grid,
+      toTile(context.selfPosition, context.tilePixels),
+      toTile(context.playerPosition, context.tilePixels),
+    );
+    if (path === null) {
+      return undefined;
+    }
+    const step = path[Math.min(stepTiles, path.length - NEXT_STEP)];
+    if (step === undefined) {
+      return undefined;
+    }
+    return {
+      x: (step.x + TILE_CENTRE) * context.tilePixels,
+      y: (step.y + TILE_CENTRE) * context.tilePixels,
+    };
   }
 
   private fight(context: EnemyContext): EnemyAction {
@@ -95,6 +149,7 @@ export class EnemyBrain {
       speed: this.behaviour.projectileSpeed,
       rangePixels: this.behaviour.rangePixels,
       damage: this.behaviour.damage,
+      hitRadiusPixels: this.behaviour.blastRadiusPixels,
     };
   }
 

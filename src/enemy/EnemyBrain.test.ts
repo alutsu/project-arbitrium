@@ -40,6 +40,7 @@ const TURRET: EnemyBehaviourData = {
   attackRate: 1,
   projectileSpeed: 320,
   rangePixels: 300,
+  blastRadiusPixels: 24,
 };
 
 const context = (over: Partial<EnemyContext> = {}): EnemyContext => ({
@@ -52,6 +53,15 @@ const context = (over: Partial<EnemyContext> = {}): EnemyContext => ({
   tilePixels: TILE,
   ...over,
 });
+
+const STALKER: EnemyBehaviourData = {
+  kind: 'Blink',
+  damage: 11,
+  attackRate: 0.8,
+  reachPixels: 36,
+  blinkRate: 0.5,
+  blinkStepTiles: 3,
+};
 
 describe('EnemyBrain', () => {
   it('holds during the Notice window, so the Parley Window is a real grace period', () => {
@@ -113,6 +123,27 @@ describe('EnemyBrain', () => {
     expect(action.velocity.y).toBeGreaterThan(0);
   });
 
+  it('blinks toward the player rather than walking (GDD 5.1)', () => {
+    const brain = new EnemyBrain(STALKER, AGGRO_DELAY_MS);
+    const action = brain.decide(context());
+    if (action.kind !== 'teleport') throw new Error('expected a teleport');
+    // Three tiles east of tile (1,1), centred: still short of the player at x 240.
+    expect(action.to.x).toBeGreaterThan(60);
+    expect(action.to.x).toBeLessThanOrEqual(240);
+  });
+
+  it('waits between blinks rather than teleporting every frame', () => {
+    const brain = new EnemyBrain(STALKER, AGGRO_DELAY_MS);
+    expect(brain.decide(context()).kind).toBe('teleport');
+    expect(brain.decide(context()).kind).toBe('hold');
+  });
+
+  it('strikes instead of blinking once it is already in reach', () => {
+    const brain = new EnemyBrain(STALKER, AGGRO_DELAY_MS);
+    const action = brain.decide(context({ playerPosition: { x: 85, y: 60 } }));
+    expect(action).toEqual({ kind: 'strike', damage: 11 });
+  });
+
   it('never moves when it is a stationary enemy', () => {
     const brain = new EnemyBrain(TURRET, AGGRO_DELAY_MS);
     const action = brain.decide(context({ playerPosition: { x: 900, y: 60 } }));
@@ -130,6 +161,13 @@ describe('EnemyBrain', () => {
   it('holds fire beyond its range', () => {
     const brain = new EnemyBrain(TURRET, AGGRO_DELAY_MS);
     expect(brain.decide(context({ playerPosition: { x: 900, y: 60 } })).kind).toBe('hold');
+  });
+
+  it('carries its blast radius on the shot, which is how the potion covers ground', () => {
+    const brain = new EnemyBrain(TURRET, AGGRO_DELAY_MS);
+    const action = brain.decide(context());
+    if (action.kind !== 'shoot') throw new Error('expected a shot');
+    expect(action.hitRadiusPixels).toBe(24);
   });
 
   it('respects its rate of fire', () => {

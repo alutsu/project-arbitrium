@@ -69,6 +69,14 @@ function parseEnemy(entry: unknown, index: number): Result<EnemyData> {
     return err(at('"prefers" must list at least one tile kind this enemy stands on'));
   }
 
+  const canBargain = readField.optionalBoolean(entry, 'canBargain');
+  if (!canBargain.ok) return err(at(canBargain.error));
+  const maxPerRoom = readField.optionalNumber(entry, 'maxPerRoom');
+  if (!maxPerRoom.ok) return err(at(maxPerRoom.error));
+  if (maxPerRoom.value !== undefined && maxPerRoom.value < MIN_WEIGHT + 1) {
+    return err(at('"maxPerRoom" must be at least 1 when given'));
+  }
+
   const behaviourRaw = entry['behaviour'];
   if (!isJsonRecord(behaviourRaw)) {
     return err(at('"behaviour" must be an object'));
@@ -88,6 +96,9 @@ function parseEnemy(entry: unknown, index: number): Result<EnemyData> {
     roomTags: roomTags.value,
     prefers: prefers.value,
     behaviour: behaviour.value,
+    // Anything that does not say otherwise can be bargained with (GDD 2.2).
+    canBargain: canBargain.value ?? true,
+    ...(maxPerRoom.value !== undefined && { maxPerRoom: maxPerRoom.value }),
   });
 }
 
@@ -122,12 +133,46 @@ function parseBehaviour(raw: JsonRecord, at: Contextualize): Result<EnemyBehavio
     });
   }
 
+  if (kind.value === 'Blink') {
+    const reachPixels = readField.number(raw, 'reachPixels');
+    if (!reachPixels.ok) return err(at(reachPixels.error));
+    const blinkRate = readField.number(raw, 'blinkRate');
+    if (!blinkRate.ok) return err(at(blinkRate.error));
+    const blinkStepTiles = readField.number(raw, 'blinkStepTiles');
+    if (!blinkStepTiles.ok) return err(at(blinkStepTiles.error));
+    if (
+      reachPixels.value <= MIN_WEIGHT ||
+      blinkRate.value <= MIN_WEIGHT ||
+      blinkStepTiles.value < MIN_WEIGHT + 1
+    ) {
+      return err(at('a Blink enemy needs a reach, a blink rate, and at least one blink tile'));
+    }
+    return ok({
+      kind: 'Blink',
+      damage: damage.value,
+      attackRate: attackRate.value,
+      reachPixels: reachPixels.value,
+      blinkRate: blinkRate.value,
+      blinkStepTiles: blinkStepTiles.value,
+    });
+  }
+
   const projectileSpeed = readField.number(raw, 'projectileSpeed');
   if (!projectileSpeed.ok) return err(at(projectileSpeed.error));
   const rangePixels = readField.number(raw, 'rangePixels');
   if (!rangePixels.ok) return err(at(rangePixels.error));
-  if (projectileSpeed.value <= MIN_WEIGHT || rangePixels.value <= MIN_WEIGHT) {
-    return err(at('a StationaryRanged enemy needs a projectile speed and a range above zero'));
+  const blastRadiusPixels = readField.number(raw, 'blastRadiusPixels');
+  if (!blastRadiusPixels.ok) return err(at(blastRadiusPixels.error));
+  if (
+    projectileSpeed.value <= MIN_WEIGHT ||
+    rangePixels.value <= MIN_WEIGHT ||
+    blastRadiusPixels.value <= MIN_WEIGHT
+  ) {
+    return err(
+      at(
+        'a StationaryRanged enemy needs a projectile speed, a range and a blast radius above zero',
+      ),
+    );
   }
   return ok({
     kind: 'StationaryRanged',
@@ -135,5 +180,6 @@ function parseBehaviour(raw: JsonRecord, at: Contextualize): Result<EnemyBehavio
     attackRate: attackRate.value,
     projectileSpeed: projectileSpeed.value,
     rangePixels: rangePixels.value,
+    blastRadiusPixels: blastRadiusPixels.value,
   });
 }

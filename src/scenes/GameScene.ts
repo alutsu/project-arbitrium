@@ -292,7 +292,7 @@ export class GameScene extends Phaser.Scene {
     if (room === null) {
       return;
     }
-    this.settleClearance(room, parley.bargainableCount);
+    this.settleClearance(room, this.enemies.filter((enemy) => enemy.isAlive).length);
     if (isForgeRoom(room)) {
       this.pedestalView?.hide();
       this.offerForge(room, actor.position, intent);
@@ -362,7 +362,12 @@ export class GameScene extends Phaser.Scene {
         rangePixels: action.rangePixels,
         damage: action.damage,
         knockback: NONE,
+        hitRadiusPixels: action.hitRadiusPixels,
       });
+      return;
+    }
+    if (action.kind === 'teleport') {
+      enemy.blinkTo(action.to);
       return;
     }
     enemy.halt();
@@ -468,7 +473,12 @@ export class GameScene extends Phaser.Scene {
     return template.tiles[tileY * template.widthInTiles + tileX] !== TERRAIN_GID.floor;
   }
 
-  /** A room is cleared once nothing in it is left to bargain with (GDD 2.1 phase 4). */
+  /**
+   * A room is cleared once nothing in it is left alive (GDD 2.1 phase 4).
+   *
+   * Counted over enemies rather than negotiable ones: a Boss cannot be bargained with,
+   * and counting the Parley roster would have declared its room clear on arrival.
+   */
   private settleClearance(room: DungeonRoom, remaining: number): void {
     if (remaining > NONE || this.progress.isCleared(room.coordinate)) {
       return;
@@ -710,7 +720,11 @@ export class GameScene extends Phaser.Scene {
         aggroDelayMs: this.aggroDelayMs,
       });
       this.enemies.push(enemy);
-      this.parleySystem?.add(enemy);
+      // A Boss cannot be bargained with (GDD 2.2.2), so it never joins the roster and
+      // never shows a Desire Icon.
+      if (spawn.enemy.canBargain) {
+        this.parleySystem?.add(enemy);
+      }
     }
   }
 

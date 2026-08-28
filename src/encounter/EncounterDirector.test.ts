@@ -56,6 +56,7 @@ const enemy = (shape: EnemyShape): EnemyData => ({
     attackRate: 1,
     reachPixels: 34,
   },
+  canBargain: true,
 });
 
 const GRUNT = enemy({ id: 'grunt', roomTags: ['Arena', 'Corridor'], prefers: ['Open', 'Cover'] });

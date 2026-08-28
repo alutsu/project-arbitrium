@@ -33,6 +33,27 @@
         "kind": "Pride",
         "speedPenalty": 0.2
       }
+    },
+    {
+      "tier": "Rare",
+      "cost": {
+        "kind": "Gold",
+        "fractionOfGold": 0.45
+      }
+    },
+    {
+      "tier": "Rare",
+      "cost": {
+        "kind": "Vitality",
+        "damage": 20
+      }
+    },
+    {
+      "tier": "Rare",
+      "cost": {
+        "kind": "Pride",
+        "speedPenalty": 0.35
+      }
     }
   ]
 }

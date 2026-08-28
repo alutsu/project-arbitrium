@@ -3,7 +3,7 @@ import { err, ok, type Result } from '../core/Result';
 import { DIRECTIONS, oppositeOf, stepFrom, type Direction } from './Direction';
 import { Dungeon, type DungeonRoom } from './Dungeon';
 import { coordinateKey, type GridCoordinate } from './GridCoordinate';
-import { FORGE_ROOM_TAG, hasExit, type RoomTemplate } from './RoomTemplate';
+import { BOSS_ROOM_TAG, FORGE_ROOM_TAG, hasExit, type RoomTemplate } from './RoomTemplate';
 
 export interface DungeonGeneratorDeps {
   readonly templates: readonly RoomTemplate[];
@@ -35,7 +35,10 @@ export class DungeonGenerator {
 
   /** The walk draws only from ordinary rooms; special rooms are placed afterwards. */
   private get ordinaryTemplates(): readonly RoomTemplate[] {
-    return this.deps.templates.filter((template) => !template.tags.includes(FORGE_ROOM_TAG));
+    return this.deps.templates.filter(
+      (template) =>
+        !template.tags.includes(FORGE_ROOM_TAG) && !template.tags.includes(BOSS_ROOM_TAG),
+    );
   }
 
   public generate(): Result<Dungeon> {
@@ -82,7 +85,9 @@ export class DungeonGenerator {
       );
     }
 
-    this.placeForge(placed);
+    // Boss first, because it claims the furthest room; the Forge takes any other.
+    const bossKey = this.placeBoss(placed);
+    this.placeForge(placed, bossKey);
     return ok(new Dungeon(this.linkRooms(placed), ORIGIN));
   }
 
@@ -130,10 +135,10 @@ export class DungeonGenerator {
    * carries all four doors, so swapping it in cannot break a connection the walk made;
    * links are recomputed afterwards either way.
    */
-  private placeForge(placed: Map<string, RoomTemplate>): void {
+  private placeForge(placed: Map<string, RoomTemplate>, bossKey: string | undefined): void {
     const forge = this.deps.templates.find((template) => template.tags.includes(FORGE_ROOM_TAG));
     const entrance = coordinateKey(ORIGIN);
-    const elsewhere = [...placed.keys()].filter((key) => key !== entrance);
+    const elsewhere = [...placed.keys()].filter((key) => key !== entrance && key !== bossKey);
     if (forge === undefined || elsewhere.length === NONE) {
       return;
     }
@@ -141,6 +146,23 @@ export class DungeonGenerator {
     if (key !== undefined) {
       placed.set(key, forge);
     }
+  }
+
+  /**
+   * Puts the Boss in the room furthest from the entrance, so reaching it means crossing
+   * the floor. Chosen by distance rather than at random, and never the entrance.
+   */
+  private placeBoss(placed: Map<string, RoomTemplate>): string | undefined {
+    const boss = this.deps.templates.find((template) => template.tags.includes(BOSS_ROOM_TAG));
+    const entrance = coordinateKey(ORIGIN);
+    const elsewhere = [...placed.keys()].filter((key) => key !== entrance);
+    if (boss === undefined || elsewhere.length === NONE) {
+      return undefined;
+    }
+    // Ties break on the key, so the same floor always names the same Boss room.
+    const furthest = elsewhere.reduce((best, key) => (isFurther(key, best) ? key : best));
+    placed.set(furthest, boss);
+    return furthest;
   }
 
   /** A door is real only when the room on the other side opens back onto it. */
@@ -170,6 +192,16 @@ function unusedDoorsOf(
   return template.exits
     .filter((exit) => exit.direction !== entrance)
     .map((exit) => ({ from: at, direction: exit.direction }));
+}
+
+function manhattanFromOrigin(coordinate: GridCoordinate): number {
+  return Math.abs(coordinate.x - ORIGIN.x) + Math.abs(coordinate.y - ORIGIN.y);
+}
+
+function isFurther(candidate: string, best: string): boolean {
+  const gap = manhattanFromOrigin(parseKey(candidate));
+  const bestGap = manhattanFromOrigin(parseKey(best));
+  return gap > bestGap || (gap === bestGap && candidate < best);
 }
 
 function parseKey(key: string): GridCoordinate {

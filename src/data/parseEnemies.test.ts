@@ -18,6 +18,7 @@ const GRUNT = {
     attackRate: 0.9,
     reachPixels: 34,
   },
+  canBargain: true,
 };
 
 const errorOf = (raw: unknown): string => {
@@ -66,6 +67,7 @@ describe('parseEnemies', () => {
         attackRate: 0.7,
         projectileSpeed: 300,
         rangePixels: 340,
+        blastRadiusPixels: 20,
       },
     };
     const outcome = parseEnemies([turret]);
@@ -78,7 +80,13 @@ describe('parseEnemies', () => {
     expect(errorOf([noReach])).toContain('reach');
     const noRange = {
       ...GRUNT,
-      behaviour: { kind: 'StationaryRanged', damage: 5, attackRate: 1, projectileSpeed: 300 },
+      behaviour: {
+        kind: 'StationaryRanged',
+        damage: 5,
+        attackRate: 1,
+        projectileSpeed: 300,
+        blastRadiusPixels: 20,
+      },
     };
     expect(errorOf([noRange])).toContain('rangePixels');
   });
@@ -87,6 +95,38 @@ describe('parseEnemies', () => {
     expect(errorOf([{ ...GRUNT, behaviour: { ...GRUNT.behaviour, damage: 0 } }])).toContain(
       'damage',
     );
+  });
+
+  it('parses a Blink behaviour', () => {
+    const stalker = {
+      ...GRUNT,
+      id: 'stalker',
+      behaviour: {
+        kind: 'Blink',
+        damage: 11,
+        attackRate: 0.8,
+        reachPixels: 36,
+        blinkRate: 0.5,
+        blinkStepTiles: 4,
+      },
+    };
+    const outcome = parseEnemies([stalker]);
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.value[0]?.behaviour.kind).toBe('Blink');
+  });
+
+  it('treats an enemy as negotiable unless it says otherwise (GDD 2.2.2)', () => {
+    const outcome = parseEnemies([GRUNT]);
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.value[0]?.canBargain).toBe(true);
+
+    const boss = parseEnemies([{ ...GRUNT, canBargain: false }]);
+    if (!boss.ok) throw new Error(boss.error);
+    expect(boss.value[0]?.canBargain).toBe(false);
+  });
+
+  it('rejects a maxPerRoom below one', () => {
+    expect(errorOf([{ ...GRUNT, maxPerRoom: 0 }])).toContain('maxPerRoom');
   });
 
   it('names the offending index', () => {

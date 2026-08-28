@@ -3,8 +3,8 @@ import type { Damageable } from './Damageable';
 
 const MILLISECONDS_PER_SECOND = 1000;
 const SPENT = 0;
-/** Projectile radius plus a typical enemy radius. */
-const HIT_RADIUS = 17;
+/** Projectile radius plus a typical body radius, when a shot does not say otherwise. */
+const DEFAULT_HIT_RADIUS = 17;
 
 export interface Shot {
   readonly x: number;
@@ -14,6 +14,8 @@ export interface Shot {
   readonly rangePixels: number;
   readonly damage: number;
   readonly knockback: number;
+  /** How close counts as a hit. Defaults to a body-sized radius. */
+  readonly hitRadiusPixels?: number;
 }
 
 /** What a projectile can run into. */
@@ -28,6 +30,7 @@ interface Flight {
   readonly velocityY: number;
   readonly damage: number;
   readonly knockback: number;
+  readonly hitRadiusPixels: number;
   remainingPixels: number;
 }
 
@@ -61,6 +64,7 @@ export class ProjectilePool {
       velocityY: Math.sin(shot.angle) * shot.speed,
       damage: shot.damage,
       knockback: shot.knockback,
+      hitRadiusPixels: shot.hitRadiusPixels ?? DEFAULT_HIT_RADIUS,
       remainingPixels: shot.rangePixels,
     });
   }
@@ -107,7 +111,7 @@ export class ProjectilePool {
         Math.hypot(
           candidate.position.x - flight.sprite.x,
           candidate.position.y - flight.sprite.y,
-        ) <= HIT_RADIUS,
+        ) <= flight.hitRadiusPixels,
     );
     if (target === undefined) {
       return 'flying';

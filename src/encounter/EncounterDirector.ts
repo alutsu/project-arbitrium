@@ -57,10 +57,12 @@ export class EncounterDirector {
 
     const spawns: EnemySpawn[] = [];
     const taken = new Set<string>();
+    const placedOf = new Map<string, number>();
     const wanted = this.rollCount(rng);
 
     for (let placed = 0; placed < wanted; placed++) {
-      const enemy = this.drawByWeight(suitable, rng);
+      const room = suitable.filter((candidate) => !atLimit(candidate, placedOf));
+      const enemy = this.drawByWeight(room, rng);
       if (enemy === undefined) {
         break;
       }
@@ -73,6 +75,7 @@ export class EncounterDirector {
         break;
       }
       taken.add(coordinateKey(tile));
+      placedOf.set(enemy.id, (placedOf.get(enemy.id) ?? NONE) + INCLUSIVE);
       spawns.push({ enemy, tile, demand });
     }
     return spawns;
@@ -137,4 +140,9 @@ export class EncounterDirector {
     const pool = matching.length > NONE ? matching : this.deps.demands;
     return pool[rng.nextInt(pool.length)];
   }
+}
+
+/** Whether this enemy has already filled its allowance for one room. */
+function atLimit(enemy: EnemyData, placed: ReadonlyMap<string, number>): boolean {
+  return enemy.maxPerRoom !== undefined && (placed.get(enemy.id) ?? NONE) >= enemy.maxPerRoom;
 }

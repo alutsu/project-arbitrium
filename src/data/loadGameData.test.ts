@@ -8,6 +8,7 @@ import shippedChamberWest from '../../public/data/rooms/chamber-west.json';
 import shippedCorridorEw from '../../public/data/rooms/corridor-ew.json';
 import shippedCorridorNs from '../../public/data/rooms/corridor-ns.json';
 import shippedDungeon from '../../public/data/dungeon.json';
+import shippedBoss from '../../public/data/rooms/boss.json';
 import shippedForge from '../../public/data/rooms/forge.json';
 import shippedEncounter from '../../public/data/encounter.json';
 import shippedEnemies from '../../public/data/enemies.json';
@@ -44,6 +45,7 @@ const shippedSource = new StubSource({
   [roomCacheKey('chamber-east')]: shippedChamberEast,
   [roomCacheKey('chamber-west')]: shippedChamberWest,
   [roomCacheKey('forge')]: shippedForge,
+  [roomCacheKey('boss')]: shippedBoss,
 });
 
 describe('loadGameData', () => {
@@ -70,10 +72,27 @@ describe('loadGameData', () => {
     const shapes = new Set(outcome.value.roomTemplates.flatMap((template) => template.tags));
     // The Forge is deliberately peaceful: no enemy lists it (GDD 2.4).
     shapes.delete('Forge');
+    shapes.delete('Boss');
     for (const shape of shapes) {
       const suited = outcome.value.enemies.filter((enemy) => enemy.roomTags.includes(shape));
       expect(suited.length).toBeGreaterThan(0);
     }
+  });
+
+  it('ships a Boss that cannot be bargained with and is unique (GDD 2.2.2)', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    const bosses = outcome.value.enemies.filter((enemy) => !enemy.canBargain);
+    expect(bosses).toHaveLength(1);
+    expect(bosses[0]?.maxPerRoom).toBe(1);
+    expect(bosses[0]?.roomTags).toEqual(['Boss']);
+  });
+
+  it('ships nothing but the Boss for a Boss room', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    const suited = outcome.value.enemies.filter((enemy) => enemy.roomTags.includes('Boss'));
+    expect(suited.map((enemy) => enemy.id)).toEqual(['floor_warden']);
   });
 
   it('ships a Forge room, and no enemy that would occupy it', () => {
@@ -96,10 +115,14 @@ describe('loadGameData', () => {
     expect(applicable.length).toBeGreaterThan(0);
   });
 
-  it('ships a demand for every enemy tier that can spawn', () => {
+  it('ships a demand for every tier that can actually be bargained with', () => {
     const outcome = loadGameData(shippedSource);
     if (!outcome.ok) throw new Error(outcome.error);
-    const tiers = new Set(outcome.value.enemies.map((enemy) => enemy.tier));
+    // A Boss needs no demand: it cannot be bargained with at all (GDD 2.2.2).
+    const tiers = new Set(
+      outcome.value.enemies.filter((enemy) => enemy.canBargain).map((enemy) => enemy.tier),
+    );
+    expect(tiers.size).toBeGreaterThan(1);
     for (const tier of tiers) {
       const demands = outcome.value.bargain.demands.filter((demand) => demand.tier === tier);
       expect(demands.length).toBeGreaterThan(0);

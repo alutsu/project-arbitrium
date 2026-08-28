@@ -32,7 +32,7 @@ The target demographic consists of "Hardcore Adaptors"—players who enjoy the f
 >
 > Both halves of the choice now exist and both carry risk: weapons fire, enemies have Vitality and pay Gold when killed, and enemies fight back under the states in 5.2. A run can now be lost to combat as well as to a fatal bargain.
 >
-> What remains unbuilt is content rather than mechanism: the Rare roster in 5.1, and the Boss, which has no design in this document beyond 2.2.2's "cannot be bargained with".
+> The roster in 5.1 is now populated, including a Boss that Parley cannot touch. What remains are the Modules in 2.4.2 whose effects need systems that do not exist, weapon assembly from parts (2.3.2), floors below the first, and the run lifecycle: there is no restart after DEFEATED.
 
 The fundamental atomic unit of *Project Arbitrium* is the "Room." The loop within a single room is a microcosm of the entire game's economy.
 
@@ -68,7 +68,7 @@ In an action roguelite, negotiation cannot be a menu-driven conversation; it mus
 * **The Cost:** While the button is held, the player cannot shoot. Their movement speed is reduced by 30%. This makes attempting to bargain a physical risk.
 * **The Demand:** Enemies display a "Desire Icon" above their heads.
 * *Normal Enemies:* Simple demands (percentage of current Gold, specific ammo type, or a small HP sacrifice).
-* *Rare Enemies:* Complex demands (Drop a passive item, sacrifice max HP cap).
+* *Rare Enemies:* Complex demands (Drop a passive item, sacrifice max HP cap). **Not built:** passive items do not exist and there is no max-HP-cap cost. For the MVP a Rare demand is a steeper version of the same three resources in 4.1.2 — 45% of Gold, 20 Vitality, or a 35% Pride debuff — which keeps Rare enemies bargainable without inventing systems.
 * *Unique Enemies:* Narrative demands (Complete a quick evasion minigame, "Don't move for 5 seconds").
 
 
@@ -78,6 +78,8 @@ In an action roguelite, negotiation cannot be a menu-driven conversation; it mus
 This design choice creates a negative feedback loop known as the **"Death Spiral."**
 
 * **The Trap:** If a player bargains too often, they gain no Gold to buy passive items and no XP (if an XP system exists). They reach the Boss (who cannot be bargained with) underpowered.
+
+  The Boss enforces this by carrying `canBargain: false`: it never joins the Parley roster, so it shows no Desire Icon and a hold can never settle with it. That is also why room clearance counts **enemies** rather than negotiable ones — counting the Parley roster would have declared the Boss Room clear the moment the player walked in.
 * **The Utility:** The mechanic serves as a "Run Saver," but only while the player is solvent. If the player enters a room with 1 HP, a terrible weapon and gold in the purse, bargaining is the *only* logical choice, and it converts "Game Over" into "One More Chance."
 * **The Sting:** Once the gold is gone, demands are taken in Vitality instead (4.1.2). The same Parley that saved an earlier run will end this one. The Death Spiral is not merely a slow loss of power — it is the mechanism by which mercy turns lethal.
 
@@ -268,6 +270,7 @@ We use a **Connector-Based Generation** method, rendered through `Phaser.Tilemap
 2. **Room Templates:** Pre-designed Tiled JSON maps, one file per room under `public/data/rooms`, with labeled objects for "Exits" and a map property for "Tags". They are read and validated by our own parser rather than Phaser's tilemap loader, so room data passes the same validation as every other data file.
 3. **Graph Traversal:** Starting from one entrance, the generator repeatedly takes an unused door, steps to the neighbouring slot, and places a template that opens back onto it. The floor is therefore connected by construction rather than by a repair pass. Every choice comes from an injected `Rng`, so a seed always rebuilds the same floor.
 4. **Sealing:** A template with four doors placed in a dead end would leave gaps the player could wedge into, so any door that leads nowhere is walled up before the room is drawn. This is 2.1's "doors seal", applied to geometry.
+5. **Special rooms:** two rooms are placed deliberately rather than drawn into the walk. The **Boss Room** takes the room furthest from the entrance, chosen by distance so reaching it means crossing the floor, with ties broken on the coordinate so a seed always names the same room. The **Forge Room** then takes one of the rest at random. Neither is ever the entrance, and they are never the same room. Both templates carry all four doors, so swapping them in cannot break a connection the walk made.
 
 #### 3.2.1.1 Room Template Schema
 
@@ -388,8 +391,17 @@ To ensure "Total Randomness" feels fair:
 
 Every enemy carries `vitality`, which is how much damage it absorbs, and `goldReward`, which it drops when killed. Bargaining pays none of it (2.2.2).
 
-* **Normal:** Grunt (Melee), Turret (Stationary Ranged). Grunt 18 Vitality for 9 Gold, closing at 95 px/sec to strike 7 at 0.9/sec within 34 px. Turret 30 Vitality for 14 Gold, stationary, firing 5 damage at 0.7/sec out to 340 px. First-pass values.
-* **Rare:** Blink-Stalker (Teleport), Alchemist (AOE Potion).
+All values below are first-pass MVP numbers.
+
+| Enemy | Tier | Vitality | Gold | Behaviour |
+| --- | --- | --- | --- | --- |
+| Grunt | Normal | 18 | 9 | Melee. Closes at 95 px/sec, strikes 7 at 0.9/sec within 34 px. |
+| Turret | Normal | 30 | 14 | Stationary Ranged. Fires 5 damage at 0.7/sec out to 340 px. |
+| Blink-Stalker | Rare | 26 | 22 | Blink. Does not walk: every 2 seconds it jumps 4 tiles along the path to the player, then strikes 11 at 0.8/sec within 36 px. Cover slows everything else down; it does not slow this. |
+| Alchemist | Rare | 24 | 20 | Stationary Ranged with a 48 px blast. Lobs a slow potion (185 px/sec) for 9 damage at 0.45/sec out to 320 px. The wide blast is how it covers ground without a separate area-damage system. |
+| Floor Warden | Unique | 90 | 60 | Melee, and **cannot be bargained with** (2.2.2). Slow at 72 px/sec but hits 14 at 0.75/sec within 46 px. One per Boss Room. |
+
+The Floor Warden is a proposal, not a specification: 2.2.2 said only that a Boss cannot be bargained with, so its shape was invented to fill the MVP. It is slow enough to be kited and tough enough that kiting takes a while, which is the only interesting property it currently has. Replace it freely.
 
 ### 5.2 AI Behavior Trees
 
@@ -399,7 +411,10 @@ States, checked in order:
 
 * **Notice** — for `aggroDelayMs` after the player enters, the enemy is alert but does not act. This gives the Parley Window in 2.1 real teeth: it is a genuine grace period, not merely a cheaper price.
 * **Bargaining** — while the player holds Parley and this enemy is inside the Sphere of Influence, it holds. Negotiating and attacking are not the same activity, so mercy protects while it is being offered. This is what makes the Run Saver in 2.2.2 real: a player at 16 Vitality can hold Parley and stop the beating.
-* **Combat** — a Melee enemy paths toward the player with A* (6.1 step 2, which this is the first consumer of) and strikes at its attack rate once in reach; a StationaryRanged enemy holds position and fires when the player is inside its range.
+* **Combat** — behaviour depends on the archetype, which is a discriminated union rather than a hierarchy, so a stationary enemy is not a moving one with its movement disabled:
+  * *Melee* paths toward the player with A* (6.1 step 2, which this is the first consumer of) and strikes at its attack rate once in reach.
+  * *StationaryRanged* holds position and fires when the player is inside its range.
+  * *Blink* does not walk at all. It waits out its blink cooldown, then jumps several tiles along the path to the player, which lets it cross cover that would stop anything else.
 
 Note the consequence: Parley stays the hand of anything **inside** the Sphere, but a Turret shooting from across the room is untouched by it. Distance is its own defence.
 

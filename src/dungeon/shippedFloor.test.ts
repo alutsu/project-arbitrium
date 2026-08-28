@@ -12,6 +12,7 @@ import shippedChamberWest from '../../public/data/rooms/chamber-west.json';
 import shippedCorridorEw from '../../public/data/rooms/corridor-ew.json';
 import shippedCorridorNs from '../../public/data/rooms/corridor-ns.json';
 import shippedDungeon from '../../public/data/dungeon.json';
+import shippedBoss from '../../public/data/rooms/boss.json';
 import shippedForge from '../../public/data/rooms/forge.json';
 import shippedEncounter from '../../public/data/encounter.json';
 import shippedEnemies from '../../public/data/enemies.json';
@@ -39,6 +40,7 @@ const entries: Readonly<Record<string, unknown>> = {
   [roomCacheKey('chamber-east')]: shippedChamberEast,
   [roomCacheKey('chamber-west')]: shippedChamberWest,
   [roomCacheKey('forge')]: shippedForge,
+  [roomCacheKey('boss')]: shippedBoss,
 };
 
 const source: JsonSource = { read: (key) => entries[key] };
@@ -83,6 +85,26 @@ describe('the shipped floor', () => {
     const forges = dungeon.rooms.filter((room) => room.template.tags.includes('Forge'));
     expect(forges).toHaveLength(1);
     expect(forges[0]?.coordinate).not.toEqual(dungeon.start);
+  });
+
+  it('puts exactly one Boss room at the furthest reach of the floor (GDD 2.2.2)', () => {
+    const { dungeon } = buildFloor();
+    const bosses = dungeon.rooms.filter((room) => room.template.tags.includes('Boss'));
+    expect(bosses).toHaveLength(1);
+
+    const gapTo = (room: { coordinate: { x: number; y: number } }): number =>
+      Math.abs(room.coordinate.x) + Math.abs(room.coordinate.y);
+    const furthest = Math.max(...dungeon.rooms.map(gapTo));
+    expect(bosses[0] === undefined ? -1 : gapTo(bosses[0])).toBe(furthest);
+  });
+
+  it('never puts the Forge and the Boss in the same room', () => {
+    const { dungeon } = buildFloor();
+    const both = dungeon.rooms.filter(
+      (room) => room.template.tags.includes('Boss') && room.template.tags.includes('Forge'),
+    );
+    expect(both).toEqual([]);
+    expect(dungeon.rooms.filter((r) => r.template.tags.includes('Forge'))).toHaveLength(1);
   });
 
   it('leaves the Forge reachable', () => {

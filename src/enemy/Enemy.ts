@@ -63,6 +63,12 @@ export class Enemy implements Bargainable, Damageable {
     this.sprite.setVelocity(velocity.x, velocity.y);
   }
 
+  /** Jumps to a new position, for the Blink-Stalker (GDD 5.1). */
+  public blinkTo(destination: Vector2): void {
+    this.sprite.setVelocity(0, 0);
+    this.sprite.setPosition(destination.x, destination.y);
+  }
+
   public halt(): void {
     this.sprite.setVelocity(0, 0);
   }

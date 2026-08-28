@@ -27,4 +27,11 @@ export interface EnemyData {
   readonly prefers: readonly TileKind[];
   /** How it acts in combat (GDD 5.1, 5.2). */
   readonly behaviour: EnemyBehaviourData;
+  /**
+   * Whether the player may Parley with it. A Boss cannot be bargained with (GDD 2.2.2),
+   * which is why room clearance counts enemies rather than negotiable ones.
+   */
+  readonly canBargain: boolean;
+  /** Most that may appear in one room. Absent means no limit. */
+  readonly maxPerRoom?: number;
 }

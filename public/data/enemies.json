@@ -5,10 +5,10 @@
     "tier": "Normal",
     "spriteKey": "enemy_grunt",
     "weight": 6,
-    "roomTags": ["Arena", "Corridor"],
-    "prefers": ["Open", "Cover"],
     "vitality": 18,
     "goldReward": 9,
+    "roomTags": ["Arena", "Corridor"],
+    "prefers": ["Open", "Cover"],
     "behaviour": {
       "kind": "Melee",
       "moveSpeedPixelsPerSecond": 95,
@@ -23,16 +23,75 @@
     "tier": "Normal",
     "spriteKey": "enemy_turret",
     "weight": 3,
-    "roomTags": ["Arena"],
-    "prefers": ["Corner"],
     "vitality": 30,
     "goldReward": 14,
+    "roomTags": ["Arena"],
+    "prefers": ["Corner"],
     "behaviour": {
       "kind": "StationaryRanged",
       "damage": 5,
       "attackRate": 0.7,
       "projectileSpeed": 300,
-      "rangePixels": 340
+      "rangePixels": 340,
+      "blastRadiusPixels": 18
+    }
+  },
+  {
+    "id": "blink_stalker",
+    "name": "Blink-Stalker",
+    "tier": "Rare",
+    "spriteKey": "enemy_blink_stalker",
+    "weight": 2,
+    "vitality": 26,
+    "goldReward": 22,
+    "roomTags": ["Arena", "Corridor"],
+    "prefers": ["Cover", "Corner"],
+    "behaviour": {
+      "kind": "Blink",
+      "damage": 11,
+      "attackRate": 0.8,
+      "reachPixels": 36,
+      "blinkRate": 0.5,
+      "blinkStepTiles": 4
+    }
+  },
+  {
+    "id": "alchemist",
+    "name": "Alchemist",
+    "tier": "Rare",
+    "spriteKey": "enemy_alchemist",
+    "weight": 2,
+    "vitality": 24,
+    "goldReward": 20,
+    "roomTags": ["Arena"],
+    "prefers": ["Corner", "Cover"],
+    "behaviour": {
+      "kind": "StationaryRanged",
+      "damage": 9,
+      "attackRate": 0.45,
+      "projectileSpeed": 185,
+      "rangePixels": 320,
+      "blastRadiusPixels": 48
+    }
+  },
+  {
+    "id": "floor_warden",
+    "name": "Floor Warden",
+    "tier": "Unique",
+    "spriteKey": "enemy_floor_warden",
+    "weight": 1,
+    "vitality": 90,
+    "goldReward": 60,
+    "roomTags": ["Boss"],
+    "prefers": ["Open"],
+    "canBargain": false,
+    "maxPerRoom": 1,
+    "behaviour": {
+      "kind": "Melee",
+      "moveSpeedPixelsPerSecond": 72,
+      "damage": 14,
+      "attackRate": 0.75,
+      "reachPixels": 46
     }
   }
 ]
