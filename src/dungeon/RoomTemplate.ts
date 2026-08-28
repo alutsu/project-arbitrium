@@ -4,9 +4,16 @@ import type { Direction } from './Direction';
 export type RoomTemplateId = string & { readonly __brand: 'RoomTemplateId' };
 
 /** Room shape, which the Encounter Director will spawn against in Sprint 5 (GDD 3.2.3). */
-export type RoomTag = 'Arena' | 'Corridor';
+export type RoomTag = 'Arena' | 'Corridor' | 'Forge';
 
-export const ROOM_TAGS: readonly RoomTag[] = ['Arena', 'Corridor'];
+export const ROOM_TAGS: readonly RoomTag[] = ['Arena', 'Corridor', 'Forge'];
+
+/**
+ * The Forge Room (GDD 2.4). It is placed deliberately, one per floor, rather than drawn
+ * into the random walk, and no enemy lists it in `roomTags`, so it is peaceful without
+ * needing a rule that says so.
+ */
+export const FORGE_ROOM_TAG: RoomTag = 'Forge';
 
 /** A door out of the room, and the tile the player stands on when arriving through it. */
 export interface RoomExit {

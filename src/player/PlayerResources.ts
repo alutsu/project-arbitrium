@@ -23,6 +23,11 @@ export class PlayerResources {
     return new PlayerResources(this.gold + amount, this.vitality);
   }
 
+  /** Gold spent at the Forge (GDD 2.4). */
+  public spendGold(amount: number): PlayerResources {
+    return new PlayerResources(Math.max(MIN_GOLD, this.gold - amount), this.vitality);
+  }
+
   public loseVitality(damage: number): PlayerResources {
     return new PlayerResources(this.gold, Math.max(MIN_VITALITY, this.vitality - damage));
   }

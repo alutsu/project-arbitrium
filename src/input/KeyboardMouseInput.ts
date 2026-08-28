@@ -3,6 +3,8 @@ import type { InputIntent } from './InputIntent';
 import type { InputSource } from './InputSource';
 
 const AXIS_NEUTRAL = 0;
+const FIRST_SELECTION = 1;
+const NO_SELECTION = -1;
 const AXIS_POSITIVE = 1;
 const AXIS_NEGATIVE = -1;
 
@@ -24,6 +26,7 @@ type ActionKeys = {
  */
 export class KeyboardMouseInput implements InputSource {
   private readonly keys: ActionKeys;
+  private readonly selectionKeys: readonly Phaser.Input.Keyboard.Key[];
 
   public constructor(
     private readonly input: Phaser.Input.InputPlugin,
@@ -39,6 +42,12 @@ export class KeyboardMouseInput implements InputSource {
       interact: keyboard.addKey(codes.E),
       sell: keyboard.addKey(codes.R),
     };
+    // Numbered choices for the Forge shelf (GDD 2.4).
+    this.selectionKeys = [
+      keyboard.addKey(codes.ONE),
+      keyboard.addKey(codes.TWO),
+      keyboard.addKey(codes.THREE),
+    ];
   }
 
   public readIntent(): InputIntent {
@@ -54,12 +63,23 @@ export class KeyboardMouseInput implements InputSource {
       // JustDown clears the key's edge flag, so these must be read once per frame.
       isInteracting: Phaser.Input.Keyboard.JustDown(this.keys.interact),
       isSelling: Phaser.Input.Keyboard.JustDown(this.keys.sell),
+      selection: this.readSelection(),
     };
+  }
+
+  /**
+   * Every selection key is read each frame so none keeps a stale edge flag, then the
+   * lowest pressed wins.
+   */
+  private readSelection(): number | null {
+    const pressed = this.selectionKeys.map((key) => Phaser.Input.Keyboard.JustDown(key));
+    const index = pressed.indexOf(true);
+    return index === NO_SELECTION ? null : index + FIRST_SELECTION;
   }
 
   /** Releases every key binding. Called on scene shutdown (CLAUDE.md 5). */
   public destroy(): void {
-    for (const key of Object.values(this.keys)) {
+    for (const key of [...Object.values(this.keys), ...this.selectionKeys]) {
       this.keyboard.removeKey(key, true);
     }
   }

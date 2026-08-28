@@ -3,7 +3,7 @@ import { err, ok, type Result } from '../core/Result';
 import { DIRECTIONS, oppositeOf, stepFrom, type Direction } from './Direction';
 import { Dungeon, type DungeonRoom } from './Dungeon';
 import { coordinateKey, type GridCoordinate } from './GridCoordinate';
-import { hasExit, type RoomTemplate } from './RoomTemplate';
+import { FORGE_ROOM_TAG, hasExit, type RoomTemplate } from './RoomTemplate';
 
 export interface DungeonGeneratorDeps {
   readonly templates: readonly RoomTemplate[];
@@ -32,6 +32,11 @@ const NONE = 0;
  */
 export class DungeonGenerator {
   public constructor(private readonly deps: DungeonGeneratorDeps) {}
+
+  /** The walk draws only from ordinary rooms; special rooms are placed afterwards. */
+  private get ordinaryTemplates(): readonly RoomTemplate[] {
+    return this.deps.templates.filter((template) => !template.tags.includes(FORGE_ROOM_TAG));
+  }
 
   public generate(): Result<Dungeon> {
     if (this.deps.roomCount < MIN_ROOMS) {
@@ -76,15 +81,17 @@ export class DungeonGenerator {
           'the templates do not branch enough',
       );
     }
+
+    this.placeForge(placed);
     return ok(new Dungeon(this.linkRooms(placed), ORIGIN));
   }
 
   /** Only a room that can branch makes a sensible entrance. */
   private pickStartTemplate(): Result<RoomTemplate> {
-    const branching = this.deps.templates.filter(
+    const branching = this.ordinaryTemplates.filter(
       (template) => template.exits.length >= BRANCHING_EXITS,
     );
-    const candidates = branching.length > NONE ? branching : this.deps.templates;
+    const candidates = branching.length > NONE ? branching : this.ordinaryTemplates;
     const chosen = candidates[this.deps.rng.nextInt(candidates.length)];
     if (chosen === undefined) {
       return err('no room template could be chosen as the entrance');
@@ -97,7 +104,7 @@ export class DungeonGenerator {
     placedCount: number,
     openCount: number,
   ): RoomTemplate | undefined {
-    const matching = this.deps.templates.filter((template) => hasExit(template, required));
+    const matching = this.ordinaryTemplates.filter((template) => hasExit(template, required));
     if (matching.length === NONE) {
       return undefined;
     }
@@ -116,6 +123,24 @@ export class DungeonGenerator {
       throw new Error('drew an open connection from an empty list');
     }
     return connection;
+  }
+
+  /**
+   * Turns one room into the Forge (GDD 2.4), never the entrance. The Forge template
+   * carries all four doors, so swapping it in cannot break a connection the walk made;
+   * links are recomputed afterwards either way.
+   */
+  private placeForge(placed: Map<string, RoomTemplate>): void {
+    const forge = this.deps.templates.find((template) => template.tags.includes(FORGE_ROOM_TAG));
+    const entrance = coordinateKey(ORIGIN);
+    const elsewhere = [...placed.keys()].filter((key) => key !== entrance);
+    if (forge === undefined || elsewhere.length === NONE) {
+      return;
+    }
+    const key = elsewhere[this.deps.rng.nextInt(elsewhere.length)];
+    if (key !== undefined) {
+      placed.set(key, forge);
+    }
   }
 
   /** A door is real only when the room on the other side opens back onto it. */

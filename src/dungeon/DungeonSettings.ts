@@ -6,4 +6,9 @@ export interface DungeonSettings {
    * it is being built; choosing one per run belongs with the run lifecycle.
    */
   readonly seed: number;
+  /**
+   * Which floor this is, for `UpgradeCost = BaseCost * (CurrentFloor * 1.5)` (GDD 8.2).
+   * Fixed in data because descending between floors is not built yet.
+   */
+  readonly floorNumber: number;
 }

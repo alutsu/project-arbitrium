@@ -12,6 +12,7 @@ import shippedChamberWest from '../../public/data/rooms/chamber-west.json';
 import shippedCorridorEw from '../../public/data/rooms/corridor-ew.json';
 import shippedCorridorNs from '../../public/data/rooms/corridor-ns.json';
 import shippedDungeon from '../../public/data/dungeon.json';
+import shippedForge from '../../public/data/rooms/forge.json';
 import shippedEncounter from '../../public/data/encounter.json';
 import shippedEnemies from '../../public/data/enemies.json';
 import shippedPillars from '../../public/data/rooms/pillars.json';
@@ -37,6 +38,7 @@ const entries: Readonly<Record<string, unknown>> = {
   [roomCacheKey('chamber-south')]: shippedChamberSouth,
   [roomCacheKey('chamber-east')]: shippedChamberEast,
   [roomCacheKey('chamber-west')]: shippedChamberWest,
+  [roomCacheKey('forge')]: shippedForge,
 };
 
 const source: JsonSource = { read: (key) => entries[key] };
@@ -74,6 +76,19 @@ describe('the shipped floor', () => {
     const { dungeon } = buildFloor();
     const entrance = dungeon.roomAt(dungeon.start);
     expect(entrance?.connections.length).toBeGreaterThan(0);
+  });
+
+  it('puts exactly one Forge on the floor, and never at the entrance (GDD 2.4)', () => {
+    const { dungeon } = buildFloor();
+    const forges = dungeon.rooms.filter((room) => room.template.tags.includes('Forge'));
+    expect(forges).toHaveLength(1);
+    expect(forges[0]?.coordinate).not.toEqual(dungeon.start);
+  });
+
+  it('leaves the Forge reachable', () => {
+    const { dungeon } = buildFloor();
+    const forge = dungeon.rooms.find((room) => room.template.tags.includes('Forge'));
+    expect(forge?.connections.length).toBeGreaterThan(0);
   });
 
   it('connects every room mutually', () => {

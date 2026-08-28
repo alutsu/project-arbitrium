@@ -19,6 +19,9 @@ import { resolveLiquidation, type LiquidationChoice } from '../liquidation/Liqui
 import type { WeaponData } from '../data/WeaponData';
 import { WeaponSlot } from '../weapon/WeaponSlot';
 import { PedestalView } from '../ui/PedestalView';
+import { ForgeService, type ForgeOffer } from '../forge/ForgeService';
+import { FORGE_ROOM_TAG } from '../dungeon/RoomTemplate';
+import { ForgeView } from '../ui/ForgeView';
 import { exitTowards, type RoomTemplate } from '../dungeon/RoomTemplate';
 import { Enemy } from '../enemy/Enemy';
 import { EncounterDirector } from '../encounter/EncounterDirector';
@@ -88,6 +91,9 @@ const DEPTH_HUD = 30;
 const WEAPON_STREAM_SALT = 0x5eed;
 const NO_TIME = 0;
 const NONE = 0;
+/** Selections are 1-based on the keyboard, the shelf is 0-based. */
+const CHOICE_OFFSET = 1;
+const DAMAGE_DECIMALS = 1;
 
 /**
  * Root gameplay scene. Wiring only (CLAUDE.md 3.1): it builds the systems, reads input
@@ -116,6 +122,9 @@ export class GameScene extends Phaser.Scene {
   private weaponSlot: WeaponSlot | null = null;
   private offered: WeaponData | null = null;
   private pedestalView: PedestalView | null = null;
+  private forgeService: ForgeService | null = null;
+  private forgeView: ForgeView | null = null;
+  private forgeNotice: string | null = null;
   private roomElapsedMs = NO_TIME;
 
   public constructor() {
@@ -183,7 +192,9 @@ export class GameScene extends Phaser.Scene {
       DEPTH_PARLEY,
     );
     this.roomView = new RoomView(this, TILESET_TEXTURE_KEY);
+    this.forgeService = new ForgeService(database.upgrades);
     this.pedestalView = new PedestalView(this, DEPTH_PEDESTAL);
+    this.forgeView = new ForgeView(this, DEPTH_PARLEY);
     this.hud = new ResourceHud(this, DEPTH_HUD);
 
     this.enterRoom(this.dungeon.start, null);
@@ -221,14 +232,20 @@ export class GameScene extends Phaser.Scene {
     this.hud?.render(
       parley.state,
       room === null ? '' : roomLabel(room),
-      this.weaponSlot === null ? '' : `Weapon ${this.weaponSlot.weapon.name}`,
+      this.weaponSlot === null ? '' : weaponLabelOf(this.weaponSlot),
     );
 
     if (room === null) {
       return;
     }
     this.settleClearance(room, parley.bargainableCount);
-    this.offerPedestal(room, actor.position, intent);
+    if (isForgeRoom(room)) {
+      this.pedestalView?.hide();
+      this.offerForge(room, actor.position, intent);
+    } else {
+      this.forgeView?.hide();
+      this.offerPedestal(room, actor.position, intent);
+    }
     // Doors stay sealed until the room is cleared (GDD 2.1).
     if (this.progress.isCleared(room.coordinate)) {
       this.followExits(room, actor.position);
@@ -241,7 +258,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.progress.markCleared(room.coordinate);
-    this.offered = this.weaponOffered(room);
+    this.offered = isForgeRoom(room) ? null : this.weaponOffered(room);
   }
 
   /**
@@ -283,6 +300,57 @@ export class GameScene extends Phaser.Scene {
     this.progress.markLiquidated(room.coordinate);
     this.offered = null;
     this.pedestalView?.hide();
+  }
+
+  /**
+   * Runs the Forge (GDD 2.4): the shelf is filtered to Modules that fit the held weapon,
+   * priced for the current floor, and a number key buys one.
+   */
+  private offerForge(room: DungeonRoom, playerAt: GridCoordinate, intent: InputIntent): void {
+    const forge = this.forgeService;
+    const slot = this.weaponSlot;
+    const parley = this.parleySystem;
+    const stats = this.database?.playerStats;
+    const floor = this.database?.dungeon.floorNumber;
+    if (forge === null || slot === null || parley === null || stats === undefined) {
+      return;
+    }
+    if (floor === undefined) {
+      return;
+    }
+
+    const at = this.pedestalPointFor(room);
+    const withinReach =
+      Math.hypot(at.x - playerAt.x, at.y - playerAt.y) <= stats.interactReachPixels;
+    const stock = forge.stockFor(slot, floor);
+    this.forgeView?.show(
+      stock,
+      { x: at.x, y: at.y, gold: parley.resources.gold, withinReach },
+      this.forgeNotice,
+    );
+
+    if (!withinReach || intent.selection === null) {
+      return;
+    }
+    this.buyModule(stock, intent.selection);
+  }
+
+  private buyModule(stock: readonly ForgeOffer[], selection: number): void {
+    const forge = this.forgeService;
+    const slot = this.weaponSlot;
+    const parley = this.parleySystem;
+    const offer = stock[selection - CHOICE_OFFSET];
+    if (forge === null || slot === null || parley === null || offer === undefined) {
+      return;
+    }
+    const receipt = forge.buy({ offer, slot, resources: parley.resources });
+    if (!receipt.ok) {
+      this.forgeNotice = receipt.error;
+      return;
+    }
+    this.weaponSlot = receipt.value.slot;
+    parley.replaceResources(receipt.value.resources);
+    this.forgeNotice = null;
   }
 
   /**
@@ -349,9 +417,13 @@ export class GameScene extends Phaser.Scene {
     sprite.setPosition(spawn.x, spawn.y);
     sprite.setVelocity(0, 0);
 
+    this.forgeNotice = null;
     if (this.progress.isCleared(room.coordinate)) {
       this.clearEnemySprites();
-      this.offered = this.progress.isLiquidated(room.coordinate) ? null : this.weaponOffered(room);
+      this.offered =
+        this.progress.isLiquidated(room.coordinate) || isForgeRoom(room)
+          ? null
+          : this.weaponOffered(room);
     } else {
       this.offered = null;
       this.repopulateRoom(room, sealed);
@@ -498,6 +570,7 @@ export class GameScene extends Phaser.Scene {
     this.inputSource?.destroy();
     this.parleyView?.destroy();
     this.pedestalView?.destroy();
+    this.forgeView?.destroy();
     this.roomView?.destroy();
     this.hud?.destroy();
     this.wallCollider?.destroy();
@@ -512,6 +585,8 @@ export class GameScene extends Phaser.Scene {
     this.parleySystem = null;
     this.parleyView = null;
     this.pedestalView = null;
+    this.forgeView = null;
+    this.forgeService = null;
     this.database = null;
     this.weaponSlot = null;
     this.offered = null;
@@ -521,6 +596,16 @@ export class GameScene extends Phaser.Scene {
     this.currentRoom = null;
     this.wallCollider = null;
   }
+}
+
+/** Damage is shown because fitting a Module changes it and nothing else visible. */
+function weaponLabelOf(slot: WeaponSlot): string {
+  const { weapon } = slot;
+  return `Weapon ${weapon.name} (${weapon.damage.toFixed(DAMAGE_DECIMALS)} dmg)`;
+}
+
+function isForgeRoom(room: DungeonRoom): boolean {
+  return room.template.tags.includes(FORGE_ROOM_TAG);
 }
 
 function liquidationChoiceOf(intent: InputIntent): LiquidationChoice | null {

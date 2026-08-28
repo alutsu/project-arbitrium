@@ -8,6 +8,7 @@ import shippedChamberWest from '../../public/data/rooms/chamber-west.json';
 import shippedCorridorEw from '../../public/data/rooms/corridor-ew.json';
 import shippedCorridorNs from '../../public/data/rooms/corridor-ns.json';
 import shippedDungeon from '../../public/data/dungeon.json';
+import shippedForge from '../../public/data/rooms/forge.json';
 import shippedEncounter from '../../public/data/encounter.json';
 import shippedEnemies from '../../public/data/enemies.json';
 import shippedPillars from '../../public/data/rooms/pillars.json';
@@ -42,6 +43,7 @@ const shippedSource = new StubSource({
   [roomCacheKey('chamber-south')]: shippedChamberSouth,
   [roomCacheKey('chamber-east')]: shippedChamberEast,
   [roomCacheKey('chamber-west')]: shippedChamberWest,
+  [roomCacheKey('forge')]: shippedForge,
 });
 
 describe('loadGameData', () => {
@@ -62,14 +64,36 @@ describe('loadGameData', () => {
     }
   });
 
-  it('ships an enemy for every room shape a template can have', () => {
+  it('ships an enemy for every combat room shape', () => {
     const outcome = loadGameData(shippedSource);
     if (!outcome.ok) throw new Error(outcome.error);
     const shapes = new Set(outcome.value.roomTemplates.flatMap((template) => template.tags));
+    // The Forge is deliberately peaceful: no enemy lists it (GDD 2.4).
+    shapes.delete('Forge');
     for (const shape of shapes) {
       const suited = outcome.value.enemies.filter((enemy) => enemy.roomTags.includes(shape));
       expect(suited.length).toBeGreaterThan(0);
     }
+  });
+
+  it('ships a Forge room, and no enemy that would occupy it', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    const forges = outcome.value.roomTemplates.filter((t) => t.tags.includes('Forge'));
+    expect(forges).toHaveLength(1);
+    expect(outcome.value.enemies.filter((e) => e.roomTags.includes('Forge'))).toEqual([]);
+  });
+
+  it('stocks the Forge with at least one Module the game can apply', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    const applicable = outcome.value.upgrades.filter(
+      (u) =>
+        u.damageMultiplier !== undefined ||
+        u.knockbackMultiplier !== undefined ||
+        u.extraProjectiles !== undefined,
+    );
+    expect(applicable.length).toBeGreaterThan(0);
   });
 
   it('ships a demand for every enemy tier that can spawn', () => {

@@ -19,4 +19,9 @@ export interface InputIntent {
   readonly isInteracting: boolean;
   /** One-shot: Sell (GDD 2.3.1). */
   readonly isSelling: boolean;
+  /**
+   * One-shot: the numbered choice pressed this frame, 1-based, or null. Used to pick a
+   * Module at the Forge (GDD 2.4, 3.3).
+   */
+  readonly selection: number | null;
 }

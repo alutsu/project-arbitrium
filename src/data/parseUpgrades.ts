@@ -42,6 +42,8 @@ function parseUpgrade(entry: unknown, index: number): Result<UpgradeData> {
   if (!forbiddenTags.ok) return err(at(forbiddenTags.error));
   const damageMultiplier = readField.optionalNumber(entry, 'damageMultiplier');
   if (!damageMultiplier.ok) return err(at(damageMultiplier.error));
+  const knockbackMultiplier = readField.optionalNumber(entry, 'knockbackMultiplier');
+  if (!knockbackMultiplier.ok) return err(at(knockbackMultiplier.error));
   const extraProjectiles = readField.optionalNumber(entry, 'extraProjectiles');
   if (!extraProjectiles.ok) return err(at(extraProjectiles.error));
   const enableExplosions = readField.optionalBoolean(entry, 'enableExplosions');
@@ -63,6 +65,9 @@ function parseUpgrade(entry: unknown, index: number): Result<UpgradeData> {
     // Spread conditionally so an absent modifier stays absent rather than becoming
     // an explicit undefined, which `exactOptionalPropertyTypes` rejects.
     ...(damageMultiplier.value !== undefined && { damageMultiplier: damageMultiplier.value }),
+    ...(knockbackMultiplier.value !== undefined && {
+      knockbackMultiplier: knockbackMultiplier.value,
+    }),
     ...(extraProjectiles.value !== undefined && { extraProjectiles: extraProjectiles.value }),
     ...(enableExplosions.value !== undefined && { enableExplosions: enableExplosions.value }),
   });

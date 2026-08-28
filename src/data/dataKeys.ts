@@ -32,6 +32,7 @@ export const ROOM_TEMPLATE_IDS: readonly string[] = [
   'chamber-south',
   'chamber-east',
   'chamber-west',
+  'forge',
 ];
 
 export function roomCacheKey(id: string): string {

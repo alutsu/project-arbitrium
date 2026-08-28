@@ -49,7 +49,7 @@ const BARGAIN: BargainData = {
   demands: [{ tier: 'Normal', cost: { kind: 'Gold', fractionOfGold: 0.15 } }],
 };
 
-const DUNGEON = { roomsPerFloor: 8, seed: 1 };
+const DUNGEON = { roomsPerFloor: 8, seed: 1, floorNumber: 1 };
 
 const create = (weapons: WeaponData[], upgrades: UpgradeData[]) =>
   GameDatabase.create({

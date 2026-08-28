@@ -25,5 +25,15 @@ export function parseDungeonSettings(raw: unknown): Result<DungeonSettings> {
     return err('dungeon.json: "seed" must be a whole number');
   }
 
-  return ok({ roomsPerFloor: roomsPerFloor.value, seed: seed.value });
+  const floorNumber = readField.number(raw, 'floorNumber');
+  if (!floorNumber.ok) return err(`dungeon.json: ${floorNumber.error}`);
+  if (!Number.isInteger(floorNumber.value) || floorNumber.value < MIN_ROOMS) {
+    return err('dungeon.json: "floorNumber" must be a whole number of at least 1');
+  }
+
+  return ok({
+    roomsPerFloor: roomsPerFloor.value,
+    seed: seed.value,
+    floorNumber: floorNumber.value,
+  });
 }

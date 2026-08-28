@@ -125,7 +125,10 @@ To reward creative players and utilize the gold earned from "Selling" weapons, p
 
 The Forge allows players to buy **Modules** (Upgrades). However, these upgrades are constrained by **Weapon Tags** to ensure logical consistency (e.g., a Sword cannot have "Ricochet").
 
-* **System:** When the player interacts with the Forge, the UI scans the current weapon's data object.
+* **System:** When the player interacts with the Forge, the UI scans the current weapon's data object. The filter is exactly the one in 9.1: every `requiredTag` present, no `forbiddenTag` present.
+* **The Forge Room:** One per floor. It is placed deliberately rather than drawn into the random walk (3.2.1), never at the entrance, and its template carries all four doors so it can stand anywhere. No enemy lists `Forge` in its `roomTags`, so the room is peaceful without needing a rule that says so, and it offers Modules instead of a Weapon Pedestal.
+* **Buying:** Stand within `interactReachPixels` of the anvil and press the number of a shelf entry. Prices come from 8.2 and grey out when unaffordable.
+* **A second filter:** the Forge only stocks a Module carrying a modifier the game can currently apply. Taking gold for a Module that changes nothing would be a swindle, so an inert Module stays loaded and stays tag-filterable, but is not offered. See 2.4.2.
 * **The Shop Inventory:**
 * *Universal Upgrades:* +10% Damage, +5% Crit Chance.
 * *Type-Specific Upgrades:* Only appear/unlock if the tag matches.
@@ -142,6 +145,21 @@ The Forge allows players to buy **Modules** (Upgrades). However, these upgrades 
 | Serrated Edge | Apply Bleed DOT (Damage over Time) on hit. | `[Melee]` | `[Ranged]` |
 | Quantum Mag | 20% Chance to not consume ammo. | `[Projectile]` | `[Melee]` |
 | Titan Grip | Increases Knockback by 200%. | `[Heavy]` | `[Light]` |
+| Honed Edge | +10% Damage. | *(none)* | *(none)* |
+
+Honed Edge is the universal Module 2.4.1 calls for. The other universal it mentions, +5% Crit Chance, waits on a crit system.
+
+**What is stocked today.** A Module's effect is declarative data on `UpgradeData`, so applying one is a single generic transform rather than a conditional per Module. That is why the registry pattern in CLAUDE.md 3.2 is not needed *yet*: nothing branches per id. It becomes necessary for the first Module whose effect is **behavioural** rather than numeric, at which point a strategy is registered against its id.
+
+| Module | Effect | Stocked? |
+| --- | --- | --- |
+| Honed Edge | `damageMultiplier` | yes |
+| Split Chamber | `extraProjectiles` | yes |
+| Titan Grip | `knockbackMultiplier` | yes |
+| Volatile Casing | explosion on impact | no — needs projectiles |
+| Quantum Mag | chance not to consume ammo | no — needs an ammo system |
+| Phase Blade | swing passes through walls | no — behavioural, needs combat |
+| Serrated Edge | Bleed damage over time | no — needs a damage-over-time system |
 
 ---
 
@@ -289,7 +307,7 @@ Only Normal-tier enemies ship so far. The Rare roster in 5.1 — Blink-Stalker a
 
 ### 3.3 Input System & Player Controller
 
-* **Actions:** `Move` (WASD/Analog), `Aim` (Mouse pointer/Right stick), `Attack` (Click), `Bargain` (Hold Spacebar/Trigger), `Interact` (E), `Sell` (R). Bound once from `this.input.keyboard` and the scene's active pointer.
+* **Actions:** `Move` (WASD/Analog), `Aim` (Mouse pointer/Right stick), `Attack` (Click), `Bargain` (Hold Spacebar/Trigger), `Interact` (E), `Sell` (R), `Select` (1-3, for a numbered choice such as a Forge shelf entry). Bound once from `this.input.keyboard` and the scene's active pointer.
 * **Architecture:** Devices sit behind an `InputSource` that reports one frame of intent as an `InputIntent` snapshot: held actions (Move, Aim, Attack, Bargain) plus edge-detected one-shots (Interact, Sell). The `PlayerController` consumes that snapshot and drives a narrow `PlayerActor` interface, so it neither reads Phaser input nor owns a sprite. Held actions are polled per frame rather than event-driven, which is what lets Attack and Bargain be sustained without listener bookkeeping.
 
 #### 3.3.1 Player Constants
@@ -424,6 +442,8 @@ The Forge is the primary "Gold Sink."
 * **Balance Target:** A player who "Sells" 50% of weapons should have enough gold to buy 1 Major Upgrade every 3 rooms.
 * **Formula:** `UpgradeCost = BaseCost * (CurrentFloor * 1.5)`.
 
+Implemented, rounded up so a price is always whole coins. `CurrentFloor` comes from `dungeon.json` and is fixed at 1, because descending between floors is not built; the formula is therefore correct but currently only ever evaluated at floor 1.
+
 ### 8.3 The "No Reward" Bargain Math
 
 * **Fight:** High risk, Gold/XP reward.
@@ -457,7 +477,7 @@ export class GameDatabase {
 
 Lookups throw rather than return `undefined`: an unknown id is a typo in a spawn table, a programmer error, not a runtime condition to recover from.
 
-Compatibility filtering belongs to the Forge and arrives with it in Sprint 7:
+Compatibility filtering belongs to the Forge, and lives in `getCompatibleUpgrades`. **Implemented in Sprint 7:**
 
 ```typescript
 getCompatibleUpgrades(weapon: WeaponData): UpgradeData[] {

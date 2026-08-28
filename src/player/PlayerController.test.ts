@@ -15,6 +15,7 @@ const intentAiming = (aimPoint: Vector2, moveAxes: Vector2 = { x: 0, y: 0 }): In
   isParleying: false,
   isInteracting: false,
   isSelling: false,
+  selection: null,
 });
 
 class FakeActor implements PlayerActor {
