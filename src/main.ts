@@ -16,7 +16,14 @@ const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   // Top-down game: Arcade physics with no gravity on either axis (GDD 7, Sprint 1).
   physics: {
     default: 'arcade',
-    arcade: { gravity: { x: 0, y: 0 } },
+    arcade: {
+      gravity: { x: 0, y: 0 },
+      // Step once per rendered frame rather than on a 60Hz accumulator. On a
+      // high-refresh display the accumulator only steps on some frames, which
+      // shows up as uneven motion; stepping per frame keeps travel smooth at
+      // the display's refresh rate and stays delta-correct.
+      fixedStep: false,
+    },
   },
   scene: [GameScene],
 };

@@ -8,9 +8,6 @@ import { PlayerMovement } from './PlayerMovement';
 
 const STATS = { moveSpeedPixelsPerSecond: 100, parleyMovementPenalty: 0.3 };
 
-/** A one-second frame, so a displacement reads as plain pixels-per-second. */
-const FRAME_MS = 1000;
-
 const intentAiming = (aimPoint: Vector2, moveAxes: Vector2 = { x: 0, y: 0 }): InputIntent => ({
   moveAxes,
   aimPoint,
@@ -30,11 +27,11 @@ class FakeInput implements InputSource {
 }
 
 class FakeActor implements PlayerActor {
-  public moved: Vector2 | null = null;
+  public velocity: Vector2 | null = null;
   public facing: number | null = null;
   public constructor(public readonly position: Vector2) {}
-  public moveBy(displacement: Vector2): void {
-    this.moved = displacement;
+  public setVelocity(velocity: Vector2): void {
+    this.velocity = velocity;
   }
   public setFacing(radians: number): void {
     this.facing = radians;
@@ -47,20 +44,20 @@ const controllerFor = (intent: InputIntent, actor: FakeActor, input = new FakeIn
 });
 
 describe('PlayerController', () => {
-  it('applies the resolved displacement to the actor', () => {
+  it('applies the resolved velocity to the actor', () => {
     const actor = new FakeActor({ x: 0, y: 0 });
     const { controller } = controllerFor(intentAiming({ x: 10, y: 0 }, { x: 1, y: 0 }), actor);
 
-    controller.update(FRAME_MS);
+    controller.update();
 
-    expect(actor.moved).toEqual({ x: 100, y: 0 });
+    expect(actor.velocity).toEqual({ x: 100, y: 0 });
   });
 
   it('faces the aim point', () => {
     const actor = new FakeActor({ x: 100, y: 100 });
     const { controller } = controllerFor(intentAiming({ x: 100, y: 200 }), actor);
 
-    controller.update(FRAME_MS);
+    controller.update();
 
     expect(actor.facing).toBeCloseTo(Math.PI / 2);
   });
@@ -69,7 +66,7 @@ describe('PlayerController', () => {
     const actor = new FakeActor({ x: 42, y: 42 });
     const { controller } = controllerFor(intentAiming({ x: 42, y: 42 }), actor);
 
-    controller.update(FRAME_MS);
+    controller.update();
 
     expect(actor.facing).toBeNull();
   });
@@ -78,8 +75,8 @@ describe('PlayerController', () => {
     const actor = new FakeActor({ x: 0, y: 0 });
     const { controller, input } = controllerFor(intentAiming({ x: 1, y: 1 }), actor);
 
-    controller.update(FRAME_MS);
-    controller.update(FRAME_MS);
+    controller.update();
+    controller.update();
 
     expect(input.reads).toBe(2);
   });

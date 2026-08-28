@@ -8,37 +8,37 @@ export interface MovementIntent {
 }
 
 const STOPPED: Vector2 = { x: 0, y: 0 };
-const MILLISECONDS_PER_SECOND = 1000;
 const FULL_SPEED_FACTOR = 1;
 
 /**
- * Pure movement rules: axis input becomes the distance to travel this frame.
- * Phaser-free by design so the rules are unit-testable (CLAUDE.md 3.5).
+ * Pure movement rules: axis input becomes a velocity. Phaser-free by design so the
+ * rules are unit-testable (CLAUDE.md 3.5).
  */
 export class PlayerMovement {
   public constructor(private readonly stats: PlayerStats) {}
 
   /**
-   * Returns the displacement to apply this frame, in pixels, scaled by the frame
-   * delta so travel speed is frame-rate independent (CLAUDE.md 5).
+   * Returns velocity in pixels per second.
    *
-   * @param deltaMs - Milliseconds elapsed since the previous frame.
+   * Do not multiply this by the frame delta. Arcade integrates velocity against the
+   * delta itself (`Body.update`), which is what makes travel frame-rate independent
+   * (CLAUDE.md 5). Applying a per-frame displacement here instead is what caused the
+   * lumpy movement on high-refresh displays: the physics step runs on an accumulator
+   * ahead of `scene.update`, so several frames of displacement land in one step.
    */
-  public resolveDisplacement(intent: MovementIntent, deltaMs: number): Vector2 {
+  public resolveVelocity(intent: MovementIntent): Vector2 {
     const magnitude = Math.hypot(intent.moveAxes.x, intent.moveAxes.y);
     if (magnitude === 0) {
       return STOPPED;
     }
 
-    const speed = this.currentSpeed(intent.isParleying);
-    const deltaSeconds = deltaMs / MILLISECONDS_PER_SECOND;
     // Dividing by the magnitude normalizes the input to unit length, so a diagonal
-    // travels exactly as far as a cardinal rather than sqrt(2) times as far.
-    const step = (speed * deltaSeconds) / magnitude;
+    // travels exactly as fast as a cardinal rather than sqrt(2) times as fast.
+    const speed = this.currentSpeed(intent.isParleying) / magnitude;
 
     return {
-      x: intent.moveAxes.x * step,
-      y: intent.moveAxes.y * step,
+      x: intent.moveAxes.x * speed,
+      y: intent.moveAxes.y * speed,
     };
   }
 

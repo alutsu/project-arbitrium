@@ -215,7 +215,11 @@ violation (§4.5 of this file) — the roadmap exists so that work stays sequenc
   memory leak in a roguelite with hundreds of room transitions is a crash.
 - Use **object pools** for projectiles, enemies, and particles. Never
   create/destroy per-frame entities in `update`.
-- All movement and timing are **delta-scaled**. No frame-rate-dependent logic.
+- All movement and timing are **delta-scaled**. No frame-rate-dependent logic. For an
+  Arcade body that means setting **velocity in px/sec** and letting the body integrate
+  it — never multiplying by delta yourself, and never writing body positions from
+  `scene.update`, which runs *after* the physics step and lands several frames of
+  movement in one lump on high-refresh displays.
 - Communicate between systems via a typed event bus/emitter with a declared event
   map — not by holding references to sibling systems and calling into them.
 

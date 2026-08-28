@@ -6,7 +6,7 @@ import type { Vector2 } from '../math/Vector2';
  */
 export interface PlayerActor {
   readonly position: Vector2;
-  /** Moves the player by a displacement in pixels, already scaled by the frame delta. */
-  moveBy(displacement: Vector2): void;
+  /** Sets velocity in pixels per second; the physics body integrates it. */
+  setVelocity(velocity: Vector2): void;
   setFacing(radians: number): void;
 }

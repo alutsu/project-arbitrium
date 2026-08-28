@@ -57,8 +57,8 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  public override update(_time: number, delta: number): void {
-    this.playerController?.update(delta);
+  public override update(): void {
+    this.playerController?.update();
   }
 
   /**

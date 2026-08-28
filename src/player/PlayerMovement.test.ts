@@ -6,79 +6,60 @@ import { PlayerMovement } from './PlayerMovement';
 const STATS: PlayerStats = { moveSpeedPixelsPerSecond: 200, parleyMovementPenalty: 0.3 };
 const movement = new PlayerMovement(STATS);
 
-/** One second of frames, so expected distances read as plain pixels-per-second. */
-const ONE_SECOND_MS = 1000;
-const HALF_SECOND_MS = 500;
-
-const magnitudeOf = (displacement: { x: number; y: number }): number =>
-  Math.hypot(displacement.x, displacement.y);
+const magnitudeOf = (velocity: { x: number; y: number }): number =>
+  Math.hypot(velocity.x, velocity.y);
 
 describe('PlayerMovement', () => {
   it('stands still with no axis input', () => {
-    const displacement = movement.resolveDisplacement(
-      { moveAxes: { x: 0, y: 0 }, isParleying: false },
-      ONE_SECOND_MS,
-    );
-    expect(displacement).toEqual({ x: 0, y: 0 });
+    expect(movement.resolveVelocity({ moveAxes: { x: 0, y: 0 }, isParleying: false })).toEqual({
+      x: 0,
+      y: 0,
+    });
   });
 
-  it('travels the base speed over one second on a cardinal axis', () => {
-    const displacement = movement.resolveDisplacement(
-      { moveAxes: { x: 1, y: 0 }, isParleying: false },
-      ONE_SECOND_MS,
-    );
-    expect(displacement.x).toBeCloseTo(200);
-    expect(displacement.y).toBeCloseTo(0);
-  });
-
-  it('scales the distance by the frame delta', () => {
-    const displacement = movement.resolveDisplacement(
-      { moveAxes: { x: 1, y: 0 }, isParleying: false },
-      HALF_SECOND_MS,
-    );
-    expect(displacement.x).toBeCloseTo(100);
-  });
-
-  it('covers the same ground at any frame rate', () => {
-    const intent = { moveAxes: { x: 1, y: 0 }, isParleying: false };
-    const oneLongFrame = movement.resolveDisplacement(intent, 32);
-    const twoShortFrames =
-      movement.resolveDisplacement(intent, 16).x + movement.resolveDisplacement(intent, 16).x;
-    expect(oneLongFrame.x).toBeCloseTo(twoShortFrames);
+  it('moves at the base speed on a cardinal axis', () => {
+    const velocity = movement.resolveVelocity({ moveAxes: { x: 1, y: 0 }, isParleying: false });
+    expect(velocity.x).toBeCloseTo(200);
+    expect(velocity.y).toBeCloseTo(0);
   });
 
   it('normalizes diagonal input so it does not outrun a cardinal', () => {
-    const diagonal = movement.resolveDisplacement(
-      { moveAxes: { x: 1, y: 1 }, isParleying: false },
-      ONE_SECOND_MS,
-    );
+    const diagonal = movement.resolveVelocity({ moveAxes: { x: 1, y: 1 }, isParleying: false });
     expect(magnitudeOf(diagonal)).toBeCloseTo(200);
     expect(diagonal.x).toBeCloseTo(200 / Math.SQRT2);
     expect(diagonal.y).toBeCloseTo(200 / Math.SQRT2);
   });
 
   it('normalizes a partial axis magnitude up to full speed', () => {
-    const displacement = movement.resolveDisplacement(
-      { moveAxes: { x: 0.5, y: 0 }, isParleying: false },
-      ONE_SECOND_MS,
-    );
-    expect(displacement.x).toBeCloseTo(200);
+    const velocity = movement.resolveVelocity({ moveAxes: { x: 0.5, y: 0 }, isParleying: false });
+    expect(velocity.x).toBeCloseTo(200);
+  });
+
+  it('keeps every direction at the same speed', () => {
+    const directions = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+      { x: 1, y: 1 },
+      { x: -1, y: 1 },
+      { x: 1, y: -1 },
+      { x: -1, y: -1 },
+    ];
+    for (const moveAxes of directions) {
+      const velocity = movement.resolveVelocity({ moveAxes, isParleying: false });
+      expect(magnitudeOf(velocity)).toBeCloseTo(200);
+    }
   });
 
   it('applies the parley movement penalty while bargaining (GDD 2.2.1)', () => {
-    const displacement = movement.resolveDisplacement(
-      { moveAxes: { x: 1, y: 0 }, isParleying: true },
-      ONE_SECOND_MS,
-    );
-    expect(displacement.x).toBeCloseTo(140);
+    const velocity = movement.resolveVelocity({ moveAxes: { x: 1, y: 0 }, isParleying: true });
+    expect(velocity.x).toBeCloseTo(140);
   });
 
   it('applies the parley penalty to diagonals too', () => {
-    const displacement = movement.resolveDisplacement(
-      { moveAxes: { x: -1, y: 1 }, isParleying: true },
-      ONE_SECOND_MS,
-    );
-    expect(magnitudeOf(displacement)).toBeCloseTo(140);
+    const velocity = movement.resolveVelocity({ moveAxes: { x: -1, y: 1 }, isParleying: true });
+    expect(magnitudeOf(velocity)).toBeCloseTo(140);
   });
 
   it('reads the penalty from stats rather than hardcoding it', () => {
@@ -86,11 +67,8 @@ describe('PlayerMovement', () => {
       moveSpeedPixelsPerSecond: 200,
       parleyMovementPenalty: 0.5,
     });
-    const displacement = halfSpeed.resolveDisplacement(
-      { moveAxes: { x: 1, y: 0 }, isParleying: true },
-      ONE_SECOND_MS,
-    );
-    expect(displacement.x).toBeCloseTo(100);
+    const velocity = halfSpeed.resolveVelocity({ moveAxes: { x: 1, y: 0 }, isParleying: true });
+    expect(velocity.x).toBeCloseTo(100);
   });
 
   it('keeps the shipped parley penalty at the value the GDD specifies', () => {
