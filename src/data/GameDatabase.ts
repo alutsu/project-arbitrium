@@ -1,6 +1,8 @@
 import type { BargainData } from '../bargain/BargainData';
 import type { DungeonSettings } from '../dungeon/DungeonSettings';
 import type { RoomTemplate } from '../dungeon/RoomTemplate';
+import type { EncounterSettings } from '../encounter/EncounterSettings';
+import type { EnemyData } from '../enemy/EnemyData';
 import { err, ok, type Result } from '../core/Result';
 import type { PlayerStats } from './PlayerStats';
 import type { UpgradeData, UpgradeId } from './UpgradeData';
@@ -21,6 +23,8 @@ export interface GameRecords {
   readonly bargain: BargainData;
   readonly dungeon: DungeonSettings;
   readonly roomTemplates: readonly RoomTemplate[];
+  readonly enemies: readonly EnemyData[];
+  readonly encounter: EncounterSettings;
 }
 
 export class GameDatabase {
@@ -65,6 +69,14 @@ export class GameDatabase {
 
   public get roomTemplates(): readonly RoomTemplate[] {
     return this.records.roomTemplates;
+  }
+
+  public get enemies(): readonly EnemyData[] {
+    return this.records.enemies;
+  }
+
+  public get encounter(): EncounterSettings {
+    return this.records.encounter;
   }
 
   public get weapons(): readonly WeaponData[] {

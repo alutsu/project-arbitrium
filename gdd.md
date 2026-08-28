@@ -217,6 +217,8 @@ export interface UpgradeData {
 | `public/data/bargain.json` | `bargain` | Parley constants from 4.1.3, and the Desires enemies may hold |
 | `public/data/dungeon.json` | `dungeon` | Floor size and layout seed (3.2.1) |
 | `public/data/rooms/*.json` | `room:<id>` | One Tiled room template each (3.2.1.1) |
+| `public/data/enemies.json` | `enemies` | The enemy table the Director draws from (3.2.3) |
+| `public/data/encounter.json` | `encounter` | Room population and spawn clearance (3.2.3) |
 
 Each is parsed by a validator returning `Result<T, string>`. A failure names the file, the index and the offending field; the scene throws on it rather than starting with half-valid data.
 
@@ -249,16 +251,31 @@ The shipped set is placeholder geometry to be replaced by designed rooms: `arena
 
 #### 3.2.2 Step 2: Contextual Analysis (The "Encounter Director")
 
-Once the geometry is placed, the `EncounterDirector` class scans the room.
+Once the geometry is placed, `RoomAnalyzer` scans the room and the `EncounterDirector` spawns against what it finds.
 
-* **Node Analysis:** Using a custom grid system, it identifies tiles as `[Cover]`, `[Open]`, or `[Corner]`.
+* **Node Analysis:** A custom grid pass classifies every walkable tile as `[Cover]`, `[Open]`, or `[Corner]`:
+  * **Corner** — walls on two *perpendicular* sides. Corner beats Cover because it is the stronger tactical feature: it is where something stationary wants to sit and watch the room.
+  * **Cover** — any other adjacent wall, including a parallel pair such as a corridor.
+  * **Open** — no adjacent wall at all.
+* **Sealed doors count as walls.** Analysis runs on the room *as placed*, with unconnected doorways already walled up (3.2.1), so nothing is ever placed in a gap the player cannot reach.
 
 #### 3.2.3 Step 3: Weighted Spawning
 
-The `EncounterDirector` consults the JSON `LootTable` of enemies.
+The `EncounterDirector` draws from the enemy table in `enemies.json`. Each entry declares the room shapes it belongs in (`roomTags`), the tile kinds it stands on (`prefers`), and a `weight`.
 
-* **Scenario A: Narrow Corridor Room.** Spawns "Phalanx Guards" or "Spear Skeletons".
-* **Scenario B: Open Arena Room.** Spawns "Rat Swarms" and "Mortar Turrets".
+Placement runs in that order: filter the table to enemies suiting the room's tags, draw one by weight, then put it on a tile of a kind it prefers, falling back to any free tile only if none is available. This is the Context-Driven Proceduralism pillar in practice — the roll decides *which* enemy, the geometry decides *where*.
+
+* **Scenario A: Narrow Corridor Room.** Melee blockers that make the corridor a problem — the `Grunt` from the roster in 5.1.
+* **Scenario B: Open Arena Room.** Something to close distance with plus something static punishing the open ground — `Grunt` and `Turret`.
+
+Earlier drafts of this section named "Phalanx Guards", "Spear Skeletons", "Rat Swarms" and "Mortar Turrets". Those were illustrations of the *principle*, not roster entries; **5.1 is the authoritative roster** and the table ships against it.
+
+Two rules keep an encounter stable and fair:
+
+* **Per-room seed.** Each room's encounter is drawn from a seed derived from the floor seed and the room's grid slot, so a room is not re-rolled by being revisited, and the population does not depend on the order rooms were entered.
+* **Doorway clearance.** Spawns keep `spawnClearanceTiles` away from every *connected* door, not from wherever the player currently stands. Measuring from the player would make the same room roll a different encounter depending on which way they walked in.
+
+Only Normal-tier enemies ship so far. The Rare roster in 5.1 — Blink-Stalker and Alchemist — is defined by behaviour (teleporting, throwing AOE potions) and arrives with the AI work in 5.2.
 
 ### 3.3 Input System & Player Controller
 
@@ -347,9 +364,9 @@ A custom Behavior Tree utility class or an external state machine library will h
 ### 6.1 The "Room Director" Algorithm
 
 1. **Instantiation:** `DungeonGenerator` selects a room JSON template. **Implemented in Sprint 4**; the remaining steps arrive with the Encounter Director in Sprint 5.
-2. **Baking:** Generate Navigation Grid for an A* Pathfinding Plugin (e.g., EasyStar.js) to allow enemy navigation around tiles.
-3. **Analysis Pass:** `RoomAnalyzer` identifies clusters.
-4. **Director Pass:** Selects enemies based on room Tags.
+2. **Baking:** `NavigationGrid` bakes walkability from the room as placed, and `findPath` runs A* over it, four-directional so a route never cuts a wall corner. **Implemented in Sprint 5.** Written in-house rather than via EasyStar.js — the GDD named that only as an example, and a grid A* is small enough that owning it keeps navigation Phaser-free, dependency-free and unit-testable. It has no consumer until enemies gain behaviour in 5.2.
+3. **Analysis Pass:** `RoomAnalyzer` classifies tiles as Cover, Open or Corner (3.2.2). **Implemented in Sprint 5.**
+4. **Director Pass:** `EncounterDirector` selects enemies by room tag and places them by tile kind (3.2.3). **Implemented in Sprint 5.**
 5. **Weapon Spawning:** `WeaponPedestal` sprite placed at exit coordinates.
 
 ---

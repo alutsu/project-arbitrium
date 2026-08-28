@@ -1,0 +1,5 @@
+{
+  "minEnemiesPerRoom": 2,
+  "maxEnemiesPerRoom": 4,
+  "spawnClearanceTiles": 4
+}

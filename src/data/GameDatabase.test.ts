@@ -56,6 +56,8 @@ const create = (weapons: WeaponData[], upgrades: UpgradeData[]) =>
     bargain: BARGAIN,
     dungeon: DUNGEON,
     roomTemplates: [],
+    enemies: [],
+    encounter: { minEnemiesPerRoom: 1, maxEnemiesPerRoom: 3, spawnClearanceTiles: 4 },
   });
 
 const build = (weapons: WeaponData[], upgrades: UpgradeData[]): GameDatabase => {

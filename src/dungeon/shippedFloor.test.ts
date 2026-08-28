@@ -12,6 +12,8 @@ import shippedChamberWest from '../../public/data/rooms/chamber-west.json';
 import shippedCorridorEw from '../../public/data/rooms/corridor-ew.json';
 import shippedCorridorNs from '../../public/data/rooms/corridor-ns.json';
 import shippedDungeon from '../../public/data/dungeon.json';
+import shippedEncounter from '../../public/data/encounter.json';
+import shippedEnemies from '../../public/data/enemies.json';
 import shippedPillars from '../../public/data/rooms/pillars.json';
 import shippedPlayer from '../../public/data/player.json';
 import shippedUpgrades from '../../public/data/upgrades.json';
@@ -25,6 +27,8 @@ const entries: Readonly<Record<string, unknown>> = {
   [DATA_KEYS.playerStats]: shippedPlayer,
   [DATA_KEYS.bargain]: shippedBargain,
   [DATA_KEYS.dungeon]: shippedDungeon,
+  [DATA_KEYS.enemies]: shippedEnemies,
+  [DATA_KEYS.encounter]: shippedEncounter,
   [roomCacheKey('arena')]: shippedArena,
   [roomCacheKey('pillars')]: shippedPillars,
   [roomCacheKey('corridor-ns')]: shippedCorridorNs,

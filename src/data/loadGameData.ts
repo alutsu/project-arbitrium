@@ -5,6 +5,8 @@ import { GameDatabase } from './GameDatabase';
 import type { JsonSource } from './JsonSource';
 import { parseBargainData } from './parseBargainData';
 import { parseDungeonSettings } from './parseDungeonSettings';
+import { parseEncounterSettings } from './parseEncounterSettings';
+import { parseEnemies } from './parseEnemies';
 import { parseRoomTemplate } from './parseRoomTemplate';
 import { parsePlayerStats } from './parsePlayerStats';
 import { parseUpgrades } from './parseUpgrades';
@@ -30,6 +32,12 @@ export function loadGameData(source: JsonSource): Result<GameDatabase> {
   const dungeon = parseDungeonSettings(source.read(DATA_KEYS.dungeon));
   if (!dungeon.ok) return err(dungeon.error);
 
+  const enemies = parseEnemies(source.read(DATA_KEYS.enemies));
+  if (!enemies.ok) return err(enemies.error);
+
+  const encounter = parseEncounterSettings(source.read(DATA_KEYS.encounter));
+  if (!encounter.ok) return err(encounter.error);
+
   const roomTemplates: RoomTemplate[] = [];
   for (const id of ROOM_TEMPLATE_IDS) {
     const template = parseRoomTemplate(source.read(roomCacheKey(id)), id);
@@ -44,5 +52,7 @@ export function loadGameData(source: JsonSource): Result<GameDatabase> {
     bargain: bargain.value,
     dungeon: dungeon.value,
     roomTemplates,
+    enemies: enemies.value,
+    encounter: encounter.value,
   });
 }

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "grunt",
+    "name": "Grunt",
+    "tier": "Normal",
+    "spriteKey": "enemy_grunt",
+    "weight": 6,
+    "roomTags": ["Arena", "Corridor"],
+    "prefers": ["Open", "Cover"]
+  },
+  {
+    "id": "turret",
+    "name": "Turret",
+    "tier": "Normal",
+    "spriteKey": "enemy_turret",
+    "weight": 3,
+    "roomTags": ["Arena"],
+    "prefers": ["Corner"]
+  }
+]

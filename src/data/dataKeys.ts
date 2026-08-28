@@ -4,6 +4,8 @@ interface DataKeys {
   readonly playerStats: string;
   readonly bargain: string;
   readonly dungeon: string;
+  readonly enemies: string;
+  readonly encounter: string;
 }
 
 /** Cache keys shared by the scene that loads the JSON and the code that parses it. */
@@ -13,6 +15,8 @@ export const DATA_KEYS: DataKeys = {
   playerStats: 'playerStats',
   bargain: 'bargain',
   dungeon: 'dungeon',
+  enemies: 'enemies',
+  encounter: 'encounter',
 };
 
 /**

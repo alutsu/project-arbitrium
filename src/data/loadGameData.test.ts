@@ -8,6 +8,8 @@ import shippedChamberWest from '../../public/data/rooms/chamber-west.json';
 import shippedCorridorEw from '../../public/data/rooms/corridor-ew.json';
 import shippedCorridorNs from '../../public/data/rooms/corridor-ns.json';
 import shippedDungeon from '../../public/data/dungeon.json';
+import shippedEncounter from '../../public/data/encounter.json';
+import shippedEnemies from '../../public/data/enemies.json';
 import shippedPillars from '../../public/data/rooms/pillars.json';
 import shippedPlayer from '../../public/data/player.json';
 import shippedUpgrades from '../../public/data/upgrades.json';
@@ -30,6 +32,8 @@ const shippedSource = new StubSource({
   [DATA_KEYS.playerStats]: shippedPlayer,
   [DATA_KEYS.bargain]: shippedBargain,
   [DATA_KEYS.dungeon]: shippedDungeon,
+  [DATA_KEYS.enemies]: shippedEnemies,
+  [DATA_KEYS.encounter]: shippedEncounter,
   [roomCacheKey('arena')]: shippedArena,
   [roomCacheKey('pillars')]: shippedPillars,
   [roomCacheKey('corridor-ns')]: shippedCorridorNs,
@@ -55,6 +59,26 @@ describe('loadGameData', () => {
     for (const template of outcome.value.roomTemplates) {
       expect(template.exits.length).toBeGreaterThan(0);
       expect(template.tiles).toHaveLength(template.widthInTiles * template.heightInTiles);
+    }
+  });
+
+  it('ships an enemy for every room shape a template can have', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    const shapes = new Set(outcome.value.roomTemplates.flatMap((template) => template.tags));
+    for (const shape of shapes) {
+      const suited = outcome.value.enemies.filter((enemy) => enemy.roomTags.includes(shape));
+      expect(suited.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('ships a demand for every enemy tier that can spawn', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    const tiers = new Set(outcome.value.enemies.map((enemy) => enemy.tier));
+    for (const tier of tiers) {
+      const demands = outcome.value.bargain.demands.filter((demand) => demand.tier === tier);
+      expect(demands.length).toBeGreaterThan(0);
     }
   });
 
@@ -93,6 +117,8 @@ describe('loadGameData', () => {
       [DATA_KEYS.playerStats]: shippedPlayer,
       [DATA_KEYS.bargain]: shippedBargain,
       [DATA_KEYS.dungeon]: shippedDungeon,
+      [DATA_KEYS.enemies]: shippedEnemies,
+      [DATA_KEYS.encounter]: shippedEncounter,
     });
     const outcome = loadGameData(broken);
     expect(outcome.ok).toBe(false);

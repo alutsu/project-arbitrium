@@ -1,7 +1,5 @@
 import Phaser from 'phaser';
-import type { Direction } from '../dungeon/Direction';
 import type { RoomTemplate } from '../dungeon/RoomTemplate';
-import { sealUnusedDoors } from '../dungeon/sealUnusedDoors';
 
 /** Tiled numbers its tiles from 1; a Phaser data tilemap indexes them from 0. */
 const FIRST_GID = 1;
@@ -22,14 +20,10 @@ export class RoomView {
     private readonly tilesetKey: string,
   ) {}
 
-  public show(
-    template: RoomTemplate,
-    connections: readonly Direction[],
-  ): Phaser.Tilemaps.TilemapLayer {
+  /** Takes the room as it exists on the floor, from `sealedRoomOf`. */
+  public show(template: RoomTemplate): Phaser.Tilemaps.TilemapLayer {
     this.destroy();
-
-    // A door that leads nowhere is walled up, per GDD 2.1.
-    const tiles = sealUnusedDoors(template, connections);
+    const tiles = template.tiles;
 
     const rows: number[][] = [];
     for (let y = 0; y < template.heightInTiles; y++) {

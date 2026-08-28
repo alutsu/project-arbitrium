@@ -13,8 +13,12 @@ import { DungeonGenerator } from '../dungeon/DungeonGenerator';
 import { oppositeOf, stepFrom, type Direction } from '../dungeon/Direction';
 import { coordinateKey, type GridCoordinate } from '../dungeon/GridCoordinate';
 import { isAtExit } from '../dungeon/isAtExit';
+import { sealedRoomOf } from '../dungeon/sealedRoomOf';
 import { exitTowards, type RoomTemplate } from '../dungeon/RoomTemplate';
-import { Grunt } from '../enemy/Grunt';
+import { Enemy } from '../enemy/Enemy';
+import { EncounterDirector } from '../encounter/EncounterDirector';
+import { roomSeed } from '../encounter/roomSeed';
+import { RoomAnalyzer } from '../dungeon/RoomAnalyzer';
 import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { ArcadePlayerActor } from '../player/ArcadePlayerActor';
 import { PlayerController } from '../player/PlayerController';
@@ -38,15 +42,24 @@ const PLAYER_MUZZLE_COLOR = 0xf2f2f7;
 const PLAYER_MUZZLE_LENGTH = 11;
 const PLAYER_MUZZLE_THICKNESS = 4;
 
-const GRUNT_TEXTURE_KEY = 'grunt-placeholder';
-const GRUNT_TEXTURE_SIZE = 26;
-const GRUNT_RADIUS = GRUNT_TEXTURE_SIZE * CENTER_FACTOR;
-const GRUNT_COLOR = 0xd1556b;
-const GRUNT_SPAWNS: readonly GridCoordinate[] = [
-  { x: 340, y: 240 },
-  { x: 940, y: 250 },
-  { x: 640, y: 560 },
+const ENEMY_TEXTURE_SIZE = 26;
+const ENEMY_RADIUS = ENEMY_TEXTURE_SIZE * CENTER_FACTOR;
+/**
+ * Placeholder art. A colour is picked from the sprite key so a new enemy in
+ * `enemies.json` needs no code change to become visible.
+ */
+const ENEMY_COLOR_ROSE = 0xd1556b;
+const ENEMY_COLOR_AMBER = 0xe0a458;
+const ENEMY_COLOR_VIOLET = 0x9d7fd4;
+const ENEMY_COLOR_AZURE = 0x5fa8d3;
+const ENEMY_PLACEHOLDER_COLORS: readonly number[] = [
+  ENEMY_COLOR_ROSE,
+  ENEMY_COLOR_AMBER,
+  ENEMY_COLOR_VIOLET,
+  ENEMY_COLOR_AZURE,
 ];
+const HASH_SEED = 7;
+const HASH_MULTIPLIER = 31;
 
 const TILESET_TEXTURE_KEY = 'terrain-placeholder';
 const TILE_SIZE = 40;
@@ -83,7 +96,10 @@ export class GameScene extends Phaser.Scene {
   private dungeon: Dungeon | null = null;
   private currentRoom: DungeonRoom | null = null;
   private wallCollider: Phaser.Physics.Arcade.Collider | null = null;
-  private grunts: Phaser.GameObjects.Sprite[] = [];
+  private enemySprites: Phaser.GameObjects.Sprite[] = [];
+  private readonly analyzer = new RoomAnalyzer();
+  private director: EncounterDirector | null = null;
+  private floorSeed = NO_TIME;
   private roomElapsedMs = NO_TIME;
 
   public constructor() {
@@ -96,6 +112,8 @@ export class GameScene extends Phaser.Scene {
     this.load.json(DATA_KEYS.playerStats, 'data/player.json');
     this.load.json(DATA_KEYS.bargain, 'data/bargain.json');
     this.load.json(DATA_KEYS.dungeon, 'data/dungeon.json');
+    this.load.json(DATA_KEYS.enemies, 'data/enemies.json');
+    this.load.json(DATA_KEYS.encounter, 'data/encounter.json');
     for (const id of ROOM_TEMPLATE_IDS) {
       this.load.json(roomCacheKey(id), `data/rooms/${id}.json`);
     }
@@ -124,6 +142,7 @@ export class GameScene extends Phaser.Scene {
       throw new Error(`Dungeon generation failed: ${floor.error}`);
     }
     this.dungeon = floor.value;
+    this.floorSeed = database.dungeon.seed;
 
     this.createTextures();
     this.playerSprite = this.createPlayerSprite();
@@ -134,6 +153,12 @@ export class GameScene extends Phaser.Scene {
       this.playerActor,
     );
     this.parleySystem = this.createParleySystem(database);
+    this.director = new EncounterDirector({
+      enemies: database.enemies,
+      demands: database.bargain.demands,
+      settings: database.encounter,
+      rngFor: (seed) => new SeededRng(seed),
+    });
     this.parleyView = new ParleyView(
       this,
       database.bargain.settings.sphereRadiusPixels,
@@ -142,7 +167,7 @@ export class GameScene extends Phaser.Scene {
     this.roomView = new RoomView(this, TILESET_TEXTURE_KEY);
     this.hud = new ResourceHud(this, DEPTH_HUD);
 
-    this.enterRoom(this.dungeon.start, null, database);
+    this.enterRoom(this.dungeon.start, null);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.shutdownSystems();
@@ -192,16 +217,12 @@ export class GameScene extends Phaser.Scene {
       if (exit === undefined || !isAtExit({ x: tileX, y: tileY }, exit)) {
         continue;
       }
-      this.enterRoom(stepFrom(room.coordinate, direction), direction, null);
+      this.enterRoom(stepFrom(room.coordinate, direction), direction);
       return;
     }
   }
 
-  private enterRoom(
-    coordinate: GridCoordinate,
-    travelled: Direction | null,
-    database: GameDatabase | null,
-  ): void {
+  private enterRoom(coordinate: GridCoordinate, travelled: Direction | null): void {
     const room = this.dungeon?.roomAt(coordinate);
     const view = this.roomView;
     const sprite = this.playerSprite;
@@ -209,7 +230,10 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const layer = view.show(room.template, room.connections);
+    // Everything that reasons about this room's geometry uses the sealed version, so
+    // rendering, analysis and spawning all agree on where the walls are.
+    const sealed = sealedRoomOf(room);
+    const layer = view.show(sealed);
     layer.setDepth(DEPTH_TERRAIN);
     this.wallCollider?.destroy();
     this.wallCollider = this.physics.add.collider(sprite, layer);
@@ -219,11 +243,11 @@ export class GameScene extends Phaser.Scene {
     // A Pride debuff ages by one room on entry (GDD 4.1.2).
     this.parleySystem?.onRoomEntry();
 
-    const spawn = this.spawnPointFor(room.template, travelled);
+    const spawn = this.spawnPointFor(sealed, travelled);
     sprite.setPosition(spawn.x, spawn.y);
     sprite.setVelocity(0, 0);
 
-    this.repopulateRoom(room, database);
+    this.repopulateRoom(room, sealed);
   }
 
   /** Centre of the room on arrival at the entrance, otherwise clear of the door used. */
@@ -252,30 +276,57 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Fixed Grunts in the entrance only, so Parley still has something to negotiate with.
-   * Per-room population is the Encounter Director's job in Sprint 5 (GDD 3.2.2).
+   * Asks the Encounter Director what this room contains, then places it (GDD 3.2.2,
+   * 3.2.3). The Director is seeded per room, so walking back in finds the same
+   * encounter rather than a fresh roll.
    */
-  private repopulateRoom(room: DungeonRoom, database: GameDatabase | null): void {
-    for (const grunt of this.grunts) {
-      grunt.destroy();
+  private repopulateRoom(room: DungeonRoom, sealed: RoomTemplate): void {
+    for (const sprite of this.enemySprites) {
+      sprite.destroy();
     }
-    this.grunts = [];
+    this.enemySprites = [];
     this.parleySystem?.clear();
 
-    const demands = database?.bargain.demands;
-    if (demands === undefined || coordinateKey(room.coordinate) !== coordinateKey({ x: 0, y: 0 })) {
+    const director = this.director;
+    if (director === null) {
       return;
     }
-    GRUNT_SPAWNS.forEach((spawn, index) => {
-      const demand = demands[index % demands.length];
-      if (demand === undefined) {
-        return;
-      }
-      const sprite = this.add.sprite(spawn.x, spawn.y, GRUNT_TEXTURE_KEY);
-      sprite.setDepth(DEPTH_ENTITIES);
-      this.grunts.push(sprite);
-      this.parleySystem?.add(new Grunt(sprite, demand));
+    const plan = director.plan({
+      room,
+      analysis: this.analyzer.analyze(sealed),
+      seed: roomSeed(this.floorSeed, room.coordinate),
     });
+
+    for (const spawn of plan) {
+      const textureKey = this.enemyTextureFor(spawn.enemy.spriteKey);
+      const sprite = this.add.sprite(
+        (spawn.tile.x + TILE_CENTRE) * sealed.tileWidth,
+        (spawn.tile.y + TILE_CENTRE) * sealed.tileHeight,
+        textureKey,
+      );
+      sprite.setDepth(DEPTH_ENTITIES);
+      this.enemySprites.push(sprite);
+      this.parleySystem?.add(new Enemy(sprite, spawn.enemy, spawn.demand));
+    }
+  }
+
+  /** Generates a placeholder texture per sprite key on first use. */
+  private enemyTextureFor(spriteKey: string): string {
+    if (this.textures.exists(spriteKey)) {
+      return spriteKey;
+    }
+    let hash = HASH_SEED;
+    for (const character of spriteKey) {
+      hash = (Math.imul(hash, HASH_MULTIPLIER) + character.charCodeAt(0)) >>> 0;
+    }
+    const colour =
+      ENEMY_PLACEHOLDER_COLORS[hash % ENEMY_PLACEHOLDER_COLORS.length] ??
+      ENEMY_PLACEHOLDER_COLORS[0];
+    const graphics = this.add.graphics();
+    graphics.fillStyle(colour ?? 0).fillCircle(ENEMY_RADIUS, ENEMY_RADIUS, ENEMY_RADIUS);
+    graphics.generateTexture(spriteKey, ENEMY_TEXTURE_SIZE, ENEMY_TEXTURE_SIZE);
+    graphics.destroy();
+    return spriteKey;
   }
 
   private createParleySystem(database: GameDatabase): ParleySystem {
@@ -325,10 +376,6 @@ export class GameScene extends Phaser.Scene {
     graphics.generateTexture(PLAYER_TEXTURE_KEY, PLAYER_TEXTURE_SIZE, PLAYER_TEXTURE_SIZE);
 
     graphics.clear();
-    graphics.fillStyle(GRUNT_COLOR).fillCircle(GRUNT_RADIUS, GRUNT_RADIUS, GRUNT_RADIUS);
-    graphics.generateTexture(GRUNT_TEXTURE_KEY, GRUNT_TEXTURE_SIZE, GRUNT_TEXTURE_SIZE);
-
-    graphics.clear();
     graphics.fillStyle(FLOOR_COLOR).fillRect(0, 0, TILE_SIZE, TILE_SIZE);
     graphics.fillStyle(WALL_COLOR).fillRect(TILE_SIZE, 0, TILE_SIZE, TILE_SIZE);
     graphics.generateTexture(TILESET_TEXTURE_KEY, TILE_SIZE * TILESET_TILE_COUNT, TILE_SIZE);
@@ -341,10 +388,10 @@ export class GameScene extends Phaser.Scene {
     this.roomView?.destroy();
     this.hud?.destroy();
     this.wallCollider?.destroy();
-    for (const grunt of this.grunts) {
+    for (const grunt of this.enemySprites) {
       grunt.destroy();
     }
-    this.grunts = [];
+    this.enemySprites = [];
     this.inputSource = null;
     this.playerController = null;
     this.playerActor = null;
