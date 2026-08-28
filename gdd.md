@@ -215,6 +215,8 @@ export interface UpgradeData {
 | `public/data/upgrades.json` | `upgrades` | `UpgradeData[]` |
 | `public/data/player.json` | `playerStats` | Movement values from 3.3.1 |
 | `public/data/bargain.json` | `bargain` | Parley constants from 4.1.3, and the Desires enemies may hold |
+| `public/data/dungeon.json` | `dungeon` | Floor size and layout seed (3.2.1) |
+| `public/data/rooms/*.json` | `room:<id>` | One Tiled room template each (3.2.1.1) |
 
 Each is parsed by a validator returning `Result<T, string>`. A failure names the file, the index and the offending field; the scene throws on it rather than starting with half-valid data.
 
@@ -224,11 +226,26 @@ The user requires that *"level generation should be procedural... encounter on e
 
 #### 3.2.1 Step 1: Topology (The "Dungeon Graph")
 
-We will use a **Connector-Based Generation** method utilizing `Phaser.Tilemaps.Tilemap`.
+We use a **Connector-Based Generation** method, rendered through `Phaser.Tilemaps.Tilemap`.
 
-1. **Grid Initialization:** A 2D grid manages the layout of "Rooms."
-2. **Room Templates:** Pre-designed Tiled JSON maps with labeled objects for "Exits" and "Tags".
-3. **Graph Traversal:** Randomly selects direction and pastes matching room tile data dynamically onto a main Tilemap instance.
+1. **Grid Initialization:** A 2D grid of `GridCoordinate` slots manages the layout of "Rooms". One room occupies one slot.
+2. **Room Templates:** Pre-designed Tiled JSON maps, one file per room under `public/data/rooms`, with labeled objects for "Exits" and a map property for "Tags". They are read and validated by our own parser rather than Phaser's tilemap loader, so room data passes the same validation as every other data file.
+3. **Graph Traversal:** Starting from one entrance, the generator repeatedly takes an unused door, steps to the neighbouring slot, and places a template that opens back onto it. The floor is therefore connected by construction rather than by a repair pass. Every choice comes from an injected `Rng`, so a seed always rebuilds the same floor.
+4. **Sealing:** A template with four doors placed in a dead end would leave gaps the player could wedge into, so any door that leads nowhere is walled up before the room is drawn. This is 2.1's "doors seal", applied to geometry.
+
+#### 3.2.1.1 Room Template Schema
+
+A room template is an ordinary Tiled map. The parser requires:
+
+| Element | Requirement |
+| --- | --- |
+| Tile layer `terrain` | One gid per tile, row-major: `1` floor, `2` wall. Length must equal `width * height`. |
+| Object layer `meta` | One object per exit, with class (or type) `exit` and a string property `direction` of `North`, `South`, `East` or `West`. Its position marks the tile a player stands on when arriving. At most one exit per side. |
+| Map property `tags` | Comma-separated `RoomTag` values (`Arena`, `Corridor`), which the Encounter Director will spawn against in 3.2.3. |
+
+A room with no exits is rejected: it could never be reached.
+
+The shipped set is placeholder geometry to be replaced by designed rooms: `arena` and `pillars` (four doors), `corridor-ns` and `corridor-ew` (two), and four single-door `chamber-*` rooms that cap branches.
 
 #### 3.2.2 Step 2: Contextual Analysis (The "Encounter Director")
 
@@ -325,7 +342,7 @@ A custom Behavior Tree utility class or an external state machine library will h
 
 ### 6.1 The "Room Director" Algorithm
 
-1. **Instantiation:** `DungeonGenerator` selects a room JSON template.
+1. **Instantiation:** `DungeonGenerator` selects a room JSON template. **Implemented in Sprint 4**; the remaining steps arrive with the Encounter Director in Sprint 5.
 2. **Baking:** Generate Navigation Grid for an A* Pathfinding Plugin (e.g., EasyStar.js) to allow enemy navigation around tiles.
 3. **Analysis Pass:** `RoomAnalyzer` identifies clusters.
 4. **Director Pass:** Selects enemies based on room Tags.

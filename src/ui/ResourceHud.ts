@@ -12,14 +12,16 @@ export class ResourceHud {
   private readonly readout: Phaser.GameObjects.Text;
   private readonly defeat: Phaser.GameObjects.Text;
 
-  public constructor(scene: Phaser.Scene) {
-    this.readout = scene.add.text(MARGIN, MARGIN, '', STYLE);
-    this.defeat = scene.add.text(MARGIN, MARGIN + DEFEAT_OFFSET_Y, '', DEFEAT_STYLE);
+  public constructor(scene: Phaser.Scene, depth: number) {
+    this.readout = scene.add.text(MARGIN, MARGIN, '', STYLE).setDepth(depth);
+    this.defeat = scene.add
+      .text(MARGIN, MARGIN + DEFEAT_OFFSET_Y, '', DEFEAT_STYLE)
+      .setDepth(depth);
   }
 
-  public render(resources: PlayerResources): void {
+  public render(resources: PlayerResources, roomLabel: string): void {
     this.readout.setText(
-      `Gold ${String(resources.gold)}    Vitality ${String(resources.vitality)}`,
+      `Gold ${String(resources.gold)}    Vitality ${String(resources.vitality)}    ${roomLabel}`,
     );
     this.defeat.setText(resources.isDefeated ? DEFEAT_MESSAGE : '');
   }

@@ -52,6 +52,11 @@ export class ParleySystem {
     this.bargainables.push(bargainable);
   }
 
+  /** Forgets every bargainable, for when the player leaves the room they were in. */
+  public clear(): void {
+    this.bargainables.length = 0;
+  }
+
   public get resources(): PlayerResources {
     return this.currentResources;
   }

@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import shippedArena from '../../public/data/rooms/arena.json';
 import shippedBargain from '../../public/data/bargain.json';
+import shippedChamberEast from '../../public/data/rooms/chamber-east.json';
+import shippedChamberNorth from '../../public/data/rooms/chamber-north.json';
+import shippedChamberSouth from '../../public/data/rooms/chamber-south.json';
+import shippedChamberWest from '../../public/data/rooms/chamber-west.json';
+import shippedCorridorEw from '../../public/data/rooms/corridor-ew.json';
+import shippedCorridorNs from '../../public/data/rooms/corridor-ns.json';
+import shippedDungeon from '../../public/data/dungeon.json';
+import shippedPillars from '../../public/data/rooms/pillars.json';
 import shippedPlayer from '../../public/data/player.json';
 import shippedUpgrades from '../../public/data/upgrades.json';
 import shippedWeapons from '../../public/data/weapons.json';
-import { DATA_KEYS } from './dataKeys';
+import { DATA_KEYS, ROOM_TEMPLATE_IDS, roomCacheKey } from './dataKeys';
 import type { JsonSource } from './JsonSource';
 import { loadGameData } from './loadGameData';
 
@@ -20,6 +29,15 @@ const shippedSource = new StubSource({
   [DATA_KEYS.upgrades]: shippedUpgrades,
   [DATA_KEYS.playerStats]: shippedPlayer,
   [DATA_KEYS.bargain]: shippedBargain,
+  [DATA_KEYS.dungeon]: shippedDungeon,
+  [roomCacheKey('arena')]: shippedArena,
+  [roomCacheKey('pillars')]: shippedPillars,
+  [roomCacheKey('corridor-ns')]: shippedCorridorNs,
+  [roomCacheKey('corridor-ew')]: shippedCorridorEw,
+  [roomCacheKey('chamber-north')]: shippedChamberNorth,
+  [roomCacheKey('chamber-south')]: shippedChamberSouth,
+  [roomCacheKey('chamber-east')]: shippedChamberEast,
+  [roomCacheKey('chamber-west')]: shippedChamberWest,
 });
 
 describe('loadGameData', () => {
@@ -28,6 +46,23 @@ describe('loadGameData', () => {
     if (!outcome.ok) throw new Error(outcome.error);
     expect(outcome.value.weapons.length).toBeGreaterThan(0);
     expect(outcome.value.upgrades.length).toBeGreaterThan(0);
+  });
+
+  it('ships every room template listed in the manifest, and they all validate', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.value.roomTemplates).toHaveLength(ROOM_TEMPLATE_IDS.length);
+    for (const template of outcome.value.roomTemplates) {
+      expect(template.exits.length).toBeGreaterThan(0);
+      expect(template.tiles).toHaveLength(template.widthInTiles * template.heightInTiles);
+    }
+  });
+
+  it('ships enough branching templates to build a floor', () => {
+    const outcome = loadGameData(shippedSource);
+    if (!outcome.ok) throw new Error(outcome.error);
+    const branching = outcome.value.roomTemplates.filter((t) => t.exits.length >= 2);
+    expect(branching.length).toBeGreaterThan(1);
   });
 
   it('ships the Aggro Delay and late multiplier the GDD specifies (4.1.1)', () => {
@@ -57,6 +92,7 @@ describe('loadGameData', () => {
       [DATA_KEYS.upgrades]: 'not an array',
       [DATA_KEYS.playerStats]: shippedPlayer,
       [DATA_KEYS.bargain]: shippedBargain,
+      [DATA_KEYS.dungeon]: shippedDungeon,
     });
     const outcome = loadGameData(broken);
     expect(outcome.ok).toBe(false);

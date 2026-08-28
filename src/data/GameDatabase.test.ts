@@ -45,8 +45,17 @@ const BARGAIN: BargainData = {
   demands: [{ tier: 'Normal', cost: { kind: 'Gold', fractionOfGold: 0.15 } }],
 };
 
+const DUNGEON = { roomsPerFloor: 8, seed: 1 };
+
 const create = (weapons: WeaponData[], upgrades: UpgradeData[]) =>
-  GameDatabase.create({ weapons, upgrades, playerStats: STATS, bargain: BARGAIN });
+  GameDatabase.create({
+    weapons,
+    upgrades,
+    playerStats: STATS,
+    bargain: BARGAIN,
+    dungeon: DUNGEON,
+    roomTemplates: [],
+  });
 
 const build = (weapons: WeaponData[], upgrades: UpgradeData[]): GameDatabase => {
   const outcome = create(weapons, upgrades);
@@ -61,6 +70,7 @@ describe('GameDatabase', () => {
     expect(database.upgrade('phase_blade' as UpgradeId).goldCost).toBe(40);
     expect(database.playerStats).toEqual(STATS);
     expect(database.bargain.settings.aggroDelayMs).toBe(1500);
+    expect(database.dungeon.roomsPerFloor).toBe(8);
   });
 
   it('exposes every record for iteration', () => {

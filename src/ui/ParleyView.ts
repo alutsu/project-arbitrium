@@ -33,8 +33,9 @@ export class ParleyView {
   public constructor(
     private readonly scene: Phaser.Scene,
     private readonly sphereRadiusPixels: number,
+    private readonly depth: number,
   ) {
-    this.graphics = scene.add.graphics();
+    this.graphics = scene.add.graphics().setDepth(depth);
   }
 
   public render(frame: ParleyFrame, playerX: number, playerY: number): void {
@@ -93,7 +94,10 @@ export class ParleyView {
     if (existing !== undefined) {
       return existing;
     }
-    const icon = this.scene.add.text(0, 0, '', ICON_STYLE).setOrigin(ICON_ORIGIN);
+    const icon = this.scene.add
+      .text(0, 0, '', ICON_STYLE)
+      .setOrigin(ICON_ORIGIN)
+      .setDepth(this.depth);
     this.icons.set(bargainable, icon);
     return icon;
   }
